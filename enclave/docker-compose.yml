@@ -4,7 +4,7 @@
 # the attested compose file on purpose.
 services:
   agent:
-    image: ghcr.io/doctor-gonzo/ask-ens-agent@sha256:IMAGE-DIGEST
+    image: ghcr.io/doctor-gonzo/ask-ens-agent@sha256:ef792e14581abfaa083e9e80c66594f2d2a57693e41b8cc1dccff46cdc8d2d93
     restart: always
     environment:
       PUBLIC_URL: ${PUBLIC_URL}
@@ -15,8 +15,9 @@ services:
       REQUIRE_TEE: "1"
       FACTS_REPO: "doctor-gonzo/ask-ens-agent-data"
       FACTS_PATH: "facts.yaml"
-      RECLAIM_PROVIDER_ID: "PROVIDER-ID"
-      RECLAIM_PROVIDER_VERSION: "PROVIDER-VERSION"
+      # Empty until the Frontiers provider exists; verification stays off meanwhile.
+      RECLAIM_PROVIDER_ID: ""
+      RECLAIM_PROVIDER_VERSION: ""
     ports:
       - "8790:8790"
     volumes:
