@@ -1,0 +1,28 @@
+# Phala Cloud (dstack) app: the agent in a TEE. Values in ${...} are Phala's
+# encrypted environment variables. Pin the image by digest so the attested
+# app is exactly the published build; the plain values below are part of
+# the attested compose file on purpose.
+services:
+  agent:
+    image: ghcr.io/doctor-gonzo/ask-ens-agent@sha256:IMAGE-DIGEST
+    restart: always
+    environment:
+      PUBLIC_URL: ${PUBLIC_URL}
+      CONFIDENTIAL_AI_KEY: ${CONFIDENTIAL_AI_KEY}
+      FACTS_TOKEN: ${FACTS_TOKEN}
+      RECLAIM_APP_ID: ${RECLAIM_APP_ID}
+      RECLAIM_APP_SECRET: ${RECLAIM_APP_SECRET}
+      REQUIRE_TEE: "1"
+      FACTS_REPO: "doctor-gonzo/ask-ens-agent-data"
+      FACTS_PATH: "facts.yaml"
+      RECLAIM_PROVIDER_ID: "PROVIDER-ID"
+      RECLAIM_PROVIDER_VERSION: "PROVIDER-VERSION"
+    ports:
+      - "8790:8790"
+    volumes:
+      # The dstack guest agent: keys are derived through it, and its presence
+      # is how the service knows it runs in a TEE.
+      - /var/run/dstack.sock:/var/run/dstack.sock
+      - agent-data:/data
+volumes:
+  agent-data:

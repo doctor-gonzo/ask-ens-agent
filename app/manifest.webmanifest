@@ -1,0 +1,11 @@
+{
+  "name": "Ask agent.charliethompson.eth",
+  "short_name": "Ask Charlie",
+  "description": "Charlie's personal agent, paid per question on Tempo.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f5f4ee",
+  "theme_color": "#f5f4ee",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

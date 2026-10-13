@@ -1,0 +1,23 @@
+# Fictional sample facts for development. The real file lives in a private
+# repo. Each fact names the lowest tier allowed to hear it:
+#   public   anyone who pays a dime
+#   attendee someone who proved they're registered for Paradigm Frontiers 2026
+facts:
+  - id: favorite-book
+    tier: public
+    text: Charlie's favorite book is The Dispossessed by Ursula K. Le Guin.
+  - id: home-city
+    tier: public
+    text: Charlie lives in San Francisco.
+  - id: building
+    tier: public
+    text: Charlie builds tools for privacy, coordination and better ways to work with AI.
+  - id: coffee
+    tier: attendee
+    text: Charlie's go-to coffee order is a cortado.
+  - id: at-frontiers
+    tier: attendee
+    text: Charlie is at Paradigm Frontiers this week, at Gallery 308, Fort Mason.
+location:
+  public: San Francisco
+  attendee: Gallery 308, Fort Mason

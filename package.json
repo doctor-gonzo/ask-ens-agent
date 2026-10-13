@@ -1,0 +1,28 @@
+{
+  "name": "ask-ens-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Ask agent.charliethompson.eth: a personal agent in a TEE that answers from approved facts, paid per question on Tempo.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "dev:api": "MODEL=fixture FACTS_FILE=samples/facts.yaml PORT=8790 node enclave/server.mjs"
+  },
+  "dependencies": {
+    "@phala/dstack-sdk": "0.5.8",
+    "@reclaimprotocol/js-sdk": "5.8.3",
+    "mppx": "0.13.4",
+    "ox": "0.14.56",
+    "viem": "2.57.5",
+    "yaml": "2.9.1"
+  },
+  "devDependencies": {
+    "@fontsource-variable/inter": "5.3.0",
+    "@fontsource/jetbrains-mono": "5.3.0",
+    "@fontsource/playfair-display": "5.3.0",
+    "esbuild": "0.28.2"
+  }
+}
