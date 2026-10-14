@@ -6,7 +6,7 @@ import { REFUSAL } from '../lib/config.mjs';
 import { capTier, factsFor, isListed, locationFor, menuFor, parseFacts, questionsByTier } from '../lib/facts.mjs';
 import { siteFacts } from '../lib/site.mjs';
 import { findLeaks } from '../lib/pii.mjs';
-import { aiAttendee, attendeeFrom, claimKey } from '../lib/reclaim.mjs';
+import { aiAttendee, attendeeFrom, claimKey, returnUrl } from '../lib/reclaim.mjs';
 
 const YAML = `
 facts:
@@ -179,4 +179,15 @@ test('reclaim ai provider: the signed claim must be a confirmed Frontiers page o
   assert.equal(ok({ url: 'https://www.paradigm.xyz/blog', responseMatches: [{ value: 'Frontiers 2026 registered' }] }).ok, false, 'another page');
   assert.equal(ok({ url: page, responseMatches: [{ type: 'contains', value: '"status":"confirmed"', invert: true }] }).ok, false, 'an inverted match proves absence');
   assert.equal(ok({}).ok, false);
+});
+
+test('reclaim return: only the app\'s own pages, with the session in the fragment', () => {
+  const session = 'ab'.repeat(16);
+  assert.equal(returnUrl('https://agent.charliethompson.eth.link/', session), `https://agent.charliethompson.eth.link/#reclaim=${session}`);
+  assert.equal(returnUrl('https://agent.charliethompson.eth.limo/?x=1#old', session), `https://agent.charliethompson.eth.limo/#reclaim=${session}`);
+  assert.equal(returnUrl('http://localhost:5173/', session), `http://localhost:5173/#reclaim=${session}`);
+  assert.equal(returnUrl('http://user:pw@127.0.0.1:5173/', session), `http://127.0.0.1:5173/#reclaim=${session}`);
+  for (const bad of ['https://evil.example/', 'http://agent.charliethompson.eth.link/', 'https://agent.charliethompson.eth.link.evil.example/', 'https://localhost/', 'javascript:alert(1)', '/relative', '', undefined, 42]) {
+    assert.equal(returnUrl(bad, session), null, String(bad));
+  }
 });

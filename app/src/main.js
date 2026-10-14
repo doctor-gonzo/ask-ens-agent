@@ -3,8 +3,8 @@
 // the gas. Static files only, so it can live on IPFS behind the ENS name.
 //
 // Two cards: questions anyone can ask, and questions a credential unlocks
-// (today a zkPass proof of Paradigm Frontiers registration; Reclaim when its
-// provider exists).
+// (today a Reclaim proof of Paradigm Frontiers registration; zkPass when the
+// agent is set up for it instead).
 import { Receipt } from 'mppx';
 import { Mppx, tempo } from 'mppx/client';
 import { WebAuthnP256 as Passkey, PublicKey } from 'ox';
@@ -70,8 +70,8 @@ const escape = (text) => String(text).replace(/[&<>"']/g, (c) => ({ '&': '&amp;'
 const txLink = (hash, text) => (isHash(hash) ? `<a href="${EXPLORER}/tx/${hash}" target="_blank" rel="noopener noreferrer">${text}</a>` : '');
 const cancelled = (error) => [error, error?.cause, error?.cause?.cause].some((e) => e?.name === 'NotAllowedError' || e?.name === 'AbortError');
 
-// A prepared proof request (first click), the current status poller, and the
-// current zkPass run (a sign-out or a newer run calls off an older one).
+// A prepared zkPass task (a phone's first tap), the current status poller, and
+// the current zkPass run (a sign-out or a newer run calls off an older one).
 let prepared = null;
 let pollId = 0;
 let unlockRun = 0;
@@ -386,36 +386,50 @@ $('unlock').addEventListener('click', async () => {
   if (!state.account) return openLogin(() => $('unlock').click());
   statusAt((el) => $('unlock').after(el));
   if (state.health?.zkpass) return unlockWithZkpass();
-  // Reclaim takes two clicks: the first prepares the proof request; the second
-  // opens Reclaim straight from the click, so browsers don't block it as a popup.
-  if (prepared) {
-    const { request, session, url } = prepared;
-    prepared = null;
-    render();
-    request.triggerReclaimFlow().catch(() => {});
-    const link = /^https:\/\//.test(url ?? '') ? ` No window? <a href="${escape(url)}" target="_blank" rel="noopener noreferrer">Open Reclaim</a>.` : '';
-    $('status').innerHTML = `Sign in to your Frontiers account in the Reclaim window, then come back here.${link}`;
-    return waitForProof(session);
-  }
-  state.preparing = true; // held until the request is ready, whatever renders meanwhile
+  // Reclaim opens in this tab and sends the visitor back here (#reclaim=<id>),
+  // where resumeReclaim picks up the result: one click, and no popup to block.
+  const address = state.account.address;
+  state.preparing = true; // held until the page leaves for Reclaim
   render();
-  say('Preparing your Reclaim proof…');
+  say('Opening Reclaim…');
   try {
-    const address = state.account.address;
-    const start = await post('/verify', { address });
-    if (start.status === 'verified') { say("You're verified for Frontiers."); return refresh(); }
-    const sdk = await import('@reclaimprotocol/js-sdk');
-    const { ReclaimProofRequest } = sdk.ReclaimProofRequest ? sdk : sdk.default; // a CommonJS package, so bundled under default
-    const request = await ReclaimProofRequest.fromJsonString(start.request);
+    const start = await post('/verify', { address, return_to: `${location.origin}${location.pathname}` });
     if (state.account?.address !== address) return; // signed out meanwhile
-    prepared = { session: start.session, url: start.request_url, request };
-    say('Ready. Continue to prove your Frontiers registration with Reclaim.');
+    if (start.status !== 'verified') {
+      if (!/^https:\/\//.test(start.request_url ?? '')) throw new Error("Reclaim didn't send a link to open.");
+      return location.assign(start.request_url);
+    }
+    say('');
+    await refresh();
   } catch (error) {
-    say(error.message, true);
-  } finally {
-    state.preparing = false;
-    render();
+    if (state.account?.address === address) say(error.message, true);
   }
+  state.preparing = false;
+  render();
+});
+
+// Back from Reclaim: the address carries the verification's id. It leaves the
+// address bar at once, and the page waits for the proof Reclaim posted.
+function resumeReclaim() {
+  const session = /^#reclaim=([0-9a-f]{32})/.exec(location.hash)?.[1];
+  if (!session) return;
+  history.replaceState(null, '', `${location.pathname}${location.search}`);
+  $('credential').value = 'frontiers';
+  render();
+  statusAt((el) => $('unlock').after(el));
+  say('Checking your Reclaim proof…');
+  waitForProof(session);
+}
+
+// The Back button can bring the page back as it was left ("Opening Reclaim…");
+// it starts fresh instead.
+addEventListener('pageshow', (event) => {
+  if (!event.persisted || !state.preparing) return;
+  pollId++;
+  unlockRun++;
+  state.preparing = false;
+  say('');
+  render();
 });
 
 // zkPass: on a computer the TransGate extension runs the proof in one go. On a
@@ -462,7 +476,7 @@ async function unlockWithZkpass() {
     if (stale()) return;
     if (outcome.status === 'already_claimed') return say('That Frontiers account was already used.', true);
     if (!outcome.already) remember({ kind: 'grant', tx: outcome.tx ?? null }, address);
-    say(outcome.already ? "You're already verified for Frontiers." : outcome.grant_delayed ? 'Verified. Your $1.00 is on the way.' : 'Verified: $1.00 on the house, and closer answers.');
+    say(outcome.grant_delayed ? 'Verified. Your $1.00 is on the way.' : ''); // the unlocked questions say the rest
     await refresh();
   } catch (error) {
     if (!stale()) say(error.message, true);
@@ -496,24 +510,28 @@ async function submitProof(address, result, stale) {
 }
 
 // Polls until the proof lands; a newer poll or a sign-out ends this one.
-// An error is shown but polling goes on, since a retry in Reclaim still counts.
+// Reclaim posts the proof before it sends the visitor back, so it is usually
+// there at once; two minutes without one means the attempt didn't finish.
 async function waitForProof(session) {
   const mine = ++pollId;
-  for (let i = 0; i < 200; i++) {
-    await sleep(3000);
+  for (let i = 0; i < 40; i++) {
+    if (i) await sleep(3000);
     if (mine !== pollId) return;
     let status;
-    try { status = await api(`/verify/${session}`); } catch { continue; }
+    try { status = await api(`/verify/${session}`); } catch (error) {
+      if (error.code === 'not_found') return say('That verification expired. Try again.', true);
+      continue;
+    }
     if (mine !== pollId) return;
     if (status.status === 'verified') {
-      say(status.already ? "You're already verified for Frontiers." : status.grant_delayed ? 'Verified. Your $1.00 is on the way.' : 'Verified: $1.00 on the house, and closer answers.');
+      if (!status.already && state.account) remember({ kind: 'grant', tx: status.tx ?? null }, state.account.address);
+      say(status.grant_delayed ? 'Verified. Your $1.00 is on the way.' : ''); // the unlocked questions say the rest
       return refresh();
     }
     if (status.status === 'already_claimed') return say('That Frontiers account was already used.', true);
-    if (status.status === 'failed') return say(status.error ?? 'The proof did not verify.', true);
-    if (status.error) say(status.error, true);
+    if (status.status === 'failed' || status.error) return say(status.error ?? 'The proof did not verify.', true);
   }
-  if (mine === pollId) say('The proof took too long. Try again.', true);
+  if (mine === pollId) say("Reclaim didn't send a proof. Try again.", true);
 }
 
 $('credential').addEventListener('change', () => {
@@ -646,6 +664,7 @@ async function start() {
   if (!state.health) say("Can't reach the agent right now.", true);
   else if (!state.health.ready) say('The agent is starting up on Tempo; try again in a minute.');
   await useAccount(local.get('ask:account'));
+  resumeReclaim();
   await fundIfEmpty();
 }
 start();

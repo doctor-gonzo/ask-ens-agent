@@ -52,7 +52,7 @@ JSON over HTTPS. Paid routes answer `402` with an MPP challenge first.
 | `GET /health` | `tee`, agent address, token address, chain, prices, facts status |
 | `GET /attestation` | A TDX quote whose report data binds the agent address and token |
 | `POST /faucet` `{ address }` | Forward 1.00 pathUSD, once per address a day |
-| `POST /verify` `{ address }` | Start a Reclaim proof for that address: `{ session, request_url }` |
+| `POST /verify` `{ address, return_to? }` | Start a Reclaim proof for that address: `{ session, request_url }`; Reclaim sends the visitor back to `return_to#reclaim=<session>` if it is one of the app's own pages |
 | `GET /verify/:session` | `pending`, `verified`, `already_claimed` or `failed` |
 | `POST /proofs/callback?session=` | Reclaim posts the proof; verified here |
 | `POST /verify/zkpass` `{ address, result }` | A TransGate result, checked here (allocator and validator signatures, schema, recipient = address) |

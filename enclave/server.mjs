@@ -15,7 +15,7 @@ import { answerQuestion, confidentialModel, fixtureModel } from '../lib/answer.m
 import { CHAIN_ID, DAILY_QUESTIONS, EXPLORER_URL, GRANT_UNITS, MAX_QUESTION_CHARS, OWN_PRICE, OWN_PRICE_UNITS, PATHUSD, PRICE, PRICE_UNITS, TOY } from '../lib/config.mjs';
 import { capTier, createFactsSource, factsFor, isListed, locationFor, menuFor } from '../lib/facts.mjs';
 import { loadKeys } from '../lib/keys.mjs';
-import { checkProof, claimKey, claimShape, reclaimConfig, SESSION_TTL_MS, startProof } from '../lib/reclaim.mjs';
+import { checkProof, claimKey, claimShape, reclaimConfig, returnUrl, SESSION_TTL_MS, startProof } from '../lib/reclaim.mjs';
 import { createSiteSource } from '../lib/site.mjs';
 import { dayOf, openStore } from '../lib/store.mjs';
 import { createTempo } from '../lib/tempo.mjs';
@@ -289,14 +289,15 @@ async function verifyZkpass(request) {
 // Reclaim: a session per attempt, and Reclaim posts the proof back.
 
 async function verifyStart(request) {
-  const address = addressOf((await request.json().catch(() => null))?.address);
+  const body = await request.json().catch(() => null);
+  const address = addressOf(body?.address);
   if (!address) throw new HttpError(400, 'bad_address', 'Send { "address": "0x…" }.');
   if (!reclaim.ready) throw new HttpError(503, 'not_ready', 'Frontiers verification is not set up yet.');
   if (!toyToken) throw new HttpError(503, 'starting', 'The agent is still setting up on Tempo; try again in a minute.');
   if (store.data.attendees[address]) return json(200, { status: 'verified' });
   limit('verify:all', 30, 60_000);
   const session = randomBytes(16).toString('hex');
-  const { reclaimSession, requestJson, requestUrl } = await startProof({ config: reclaim, session, address, callbackUrl: `${PUBLIC_URL}/proofs/callback?session=${session}` });
+  const { reclaimSession, requestJson, requestUrl } = await startProof({ config: reclaim, session, address, callbackUrl: `${PUBLIC_URL}/proofs/callback?session=${session}`, redirectUrl: returnUrl(body?.return_to, session) });
   store.update((data) => {
     for (const [key, value] of Object.entries(data.sessions)) if (value.expires_at <= Date.now() && value.status !== 'checking') delete data.sessions[key];
     data.sessions[session] = { address, reclaim_session: reclaimSession, status: 'pending', expires_at: Date.now() + SESSION_TTL_MS };
