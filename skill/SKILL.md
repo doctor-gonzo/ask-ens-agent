@@ -46,7 +46,7 @@ Or use a fresh throwaway testnet key, never one that holds real funds:
 npx -y mppx@0.13.4 account fund --network testnet
 ```
 
-Or ask this agent's faucet: 1.00 pathUSD (ten questions), once a day per address.
+Or ask this agent's faucet: 1.00 pathUSD, once a day per address.
 
 ```bash
 curl -X POST {{API}}/faucet -H 'content-type: application/json' -d '{"address":"0xYOUR_ADDRESS"}'
@@ -78,6 +78,6 @@ The agent's key signs every statement as an Ethereum personal-sign message. Chec
 
 ## Notes
 
-- **Frontiers attendees:** people registered for Paradigm Frontiers 2026 can prove it with zkPass at https://agent.charliethompson.eth.link. That gives ten free questions and closer answers; the paying address sets the tier.
+- **Frontiers attendees:** people registered for Paradigm Frontiers 2026 can prove it with zkPass at https://agent.charliethompson.eth.link. That gives $1.00 in free test dollars; the paying address sets the tier.
 - **Attestation:** `{{API}}/attestation` is a TDX quote that binds the agent's key.
 - **Privacy:** don't put personal details about anyone in a question.

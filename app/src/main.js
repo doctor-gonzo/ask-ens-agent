@@ -11,7 +11,7 @@ import { WebAuthnP256 as Passkey, PublicKey } from 'ox';
 import { bytesToHex, createClient, formatUnits, http, publicActions } from 'viem';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import { tempoModerato } from 'viem/chains';
-import { Abis, Account, WebAuthnP256 } from 'viem/tempo';
+import { Abis, Account, tempoActions, WebAuthnP256 } from 'viem/tempo';
 import { device, extensionInstalled, INSTALL_URL, openApp, prepare as prepareZkpass, runExtension, waitForRelay } from './zkpass.js';
 
 const API = String(window.ASK_CONFIG?.api ?? '').replace(/\/+$/, '');
@@ -36,8 +36,8 @@ const CREDENTIALS = {
 };
 
 const $ = (id) => document.getElementById(id);
-const rpc = createClient({ chain: tempoModerato, transport: http() }).extend(publicActions);
-const state = { health: null, menu: { public: [], attendee: [] }, hidden: { attendee: 0 }, menuFor: null, account: null, mppx: null, tier: 'public', toy: 0n, usd: 0n, busy: false, preparing: false };
+const rpc = createClient({ chain: tempoModerato, transport: http() }).extend(publicActions).extend(tempoActions());
+const state = { health: null, menu: { public: [], attendee: [] }, hidden: { attendee: 0 }, menuFor: null, account: null, mppx: null, tier: 'public', toy: 0n, usd: 0n, busy: false, preparing: false, funding: false };
 
 // Browser storage can be missing (private windows); the app still works without it.
 const local = {
@@ -60,7 +60,7 @@ function say(text, bad = false) {
   $('status').classList.toggle('bad', bad);
 }
 const short = (address) => `${address.slice(0, 6)}…${address.slice(-4)}`;
-const money = (units) => `$${Number(formatUnits(units, 6)).toFixed(2)}`;
+const money = (units) => `$${Number(formatUnits(units, 6)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const isHash = (value) => typeof value === 'string' && /^0x[0-9a-fA-F]{64}$/.test(value);
 const isAddress = (value) => typeof value === 'string' && /^0x[0-9a-fA-F]{40}$/.test(value);
 const escape = (text) => String(text).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -172,7 +172,7 @@ async function login(choice) {
   if (saved.kind === 'passkey') local.set('ask:passkeys', { ...(local.get('ask:passkeys') ?? {}), [saved.id]: saved.publicKey });
   local.set('ask:account', saved);
   await useAccount(saved);
-  if (choice !== 'signin') await faucet(true);
+  await fundIfEmpty();
   if (!backedUp) say("Couldn't back up this passkey, so it only works on this device.", true);
 }
 
@@ -276,7 +276,7 @@ async function paid(path, body, units = PRICE) {
   if (!state.mppx) throw new Error("Can't reach the agent right now. Try again in a minute.");
   const pay = state.toy >= units ? 'toy' : 'usd';
   if (pay === 'usd' && state.usd < units) {
-    throw new Error(`This question costs ${money(units)}, more than your balance. Get $1.00 more from your account.`);
+    throw new Error(`This question costs ${money(units)}, more than your balance. Get free test dollars from your account.`);
   }
   expectedUnits = units;
   const res = await state.mppx.fetch(`${API}${path}?pay=${pay}`, {
@@ -340,32 +340,38 @@ $('ask-form').addEventListener('submit', (event) => {
   ask(question, 'public-answer', listed ? PRICE : OWN_PRICE);
 });
 
-// ---- Free questions (forwarded from the Tempo faucet) ----
+// ---- Free test dollars, from Tempo's public testnet faucet ----
 
+// Straight from Tempo's faucet to the account; the balance shows what came.
 async function faucet(quiet = false) {
   if (!state.account) return openLogin(() => faucet());
+  if (state.funding) return;
+  state.funding = true;
+  render();
   statusAt((el) => ($('wallet-sheet').open ? $('top-up').after(el) : $('wallet').before(el)));
-  if (!quiet) busy(true, 'Getting $1.00 of free questions…');
+  if (!quiet) busy(true, 'Getting free test dollars from the Tempo faucet…');
   const address = state.account.address;
+  const before = state.toy + state.usd;
   try {
-    const sent = await post('/faucet', { address });
-    remember({ kind: 'faucet', tx: sent.tx ?? null }, address);
-    busy(false, '$1.00 added: ten questions.');
-  } catch (error) {
-    if (error.code === 'already_funded') {
-      busy(false, 'This account already got its free questions today.');
-    } else {
-      // The agent's relay is busy or down: ask Tempo's own testnet faucet directly.
-      try {
-        await rpc.request({ method: 'tempo_fundAddress', params: [address] });
-        remember({ kind: 'faucet', tx: null }, address);
-        busy(false, 'Free test dollars added from the Tempo faucet.');
-      } catch {
-        busy(false, error.message);
-      }
-    }
+    await rpc.faucet.fundSync({ account: address });
+    await refresh();
+    const added = state.account?.address === address ? state.toy + state.usd - before : 0n;
+    remember({ kind: 'faucet', amount: added > 0n ? added.toString() : null }, address);
+    if (!quiet) busy(false, 'Test dollars added.');
+  } catch {
+    if (!quiet) busy(false, "Tempo's faucet didn't answer. Try again in a minute.");
+  } finally {
+    state.funding = false;
   }
-  await refresh();
+  render();
+}
+
+// An account that can't pay for a question gets test dollars without asking.
+async function fundIfEmpty() {
+  const address = state.account?.address;
+  if (!address) return;
+  const usd = await rpc.readContract({ address: PATHUSD, abi: Abis.tip20, functionName: 'balanceOf', args: [address] }).catch(() => null);
+  if (usd !== null && usd < OWN_PRICE && state.toy < OWN_PRICE && state.account?.address === address) await faucet(true);
 }
 $('faucet').addEventListener('click', () => faucet());
 
@@ -448,7 +454,7 @@ async function unlockWithZkpass() {
     if (stale()) return;
     if (outcome.status === 'already_claimed') return say('That Frontiers account was already used.', true);
     if (!outcome.already) remember({ kind: 'grant', tx: outcome.tx ?? null }, address);
-    say(outcome.already ? "You're already verified for Frontiers." : outcome.grant_delayed ? 'Verified. Your ten questions are on the way.' : 'Verified: ten questions on the house, and closer answers.');
+    say(outcome.already ? "You're already verified for Frontiers." : outcome.grant_delayed ? 'Verified. Your $1.00 is on the way.' : 'Verified: $1.00 on the house, and closer answers.');
     await refresh();
   } catch (error) {
     if (!stale()) say(error.message, true);
@@ -485,7 +491,7 @@ async function waitForProof(session) {
     try { status = await api(`/verify/${session}`); } catch { continue; }
     if (mine !== pollId) return;
     if (status.status === 'verified') {
-      say(status.already ? "You're already verified for Frontiers." : status.grant_delayed ? 'Verified. Your ten questions are on the way.' : 'Verified: ten questions on the house, and closer answers.');
+      say(status.already ? "You're already verified for Frontiers." : status.grant_delayed ? 'Verified. Your $1.00 is on the way.' : 'Verified: $1.00 on the house, and closer answers.');
       return refresh();
     }
     if (status.status === 'already_claimed') return say('That Frontiers account was already used.', true);
@@ -525,8 +531,9 @@ function veiledQuestion() {
 function historyItem(entry) {
   const li = document.createElement('li');
   const when = escape(new Date(entry.at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }));
-  const what = entry.kind === 'ask' ? escape(entry.question ?? '') : entry.kind === 'grant' ? 'Frontiers: ten questions on the house' : 'Free test dollars';
-  const amount = entry.kind === 'ask' ? (entry.refunded ? 'refunded' : `−${money(/^\d+$/.test(entry.price ?? '') ? BigInt(entry.price) : PRICE)}`) : '+$1.00';
+  const what = entry.kind === 'ask' ? escape(entry.question ?? '') : entry.kind === 'grant' ? 'Frontiers: $1.00 on the house' : 'Test dollars from the Tempo faucet';
+  const units = (value, fallback) => (/^\d+$/.test(value ?? '') ? BigInt(value) : fallback);
+  const amount = entry.kind === 'ask' ? (entry.refunded ? 'refunded' : `−${money(units(entry.price, PRICE))}`) : entry.kind === 'grant' ? '+$1.00' : entry.amount ? `+${money(units(entry.amount, 0n))}` : 'added';
   const links = [txLink(entry.tx, 'Payment'), txLink(entry.refund, 'refund')].filter(Boolean).join(' · ');
   const row = (tag) => `<${tag} class="row"><span class="what">${what}</span><span class="amount">${amount}</span><span class="when">${when}</span></${tag}>`;
   li.innerHTML = entry.kind === 'ask' && typeof entry.answer === 'string'
@@ -593,7 +600,7 @@ function render() {
   // Top right, once signed in: what you can spend (all of it test dollars to the visitor).
   const balance = $('balance');
   balance.hidden = !state.account;
-  balance.textContent = state.account ? money(state.toy + state.usd) : '';
+  balance.textContent = !state.account ? '' : state.funding ? 'Adding test dollars…' : money(state.toy + state.usd);
   $('wallet').hidden = !state.account || state.toy >= PRICE || state.usd >= PRICE;
   renderWallet();
 }
@@ -615,5 +622,6 @@ async function start() {
   if (!state.health) say("Can't reach the agent right now.", true);
   else if (!state.health.ready) say('The agent is starting up on Tempo; try again in a minute.');
   await useAccount(local.get('ask:account'));
+  await fundIfEmpty();
 }
 start();
