@@ -199,9 +199,37 @@ $('login').addEventListener('close', async () => {
   }
 });
 
+// ---- The account sheet: balance, top-ups, payments, sign-out ----
+
+const historyKey = () => `ask:history:${state.account?.address}`;
+function remember(entry) {
+  if (state.account) local.set(historyKey(), [{ at: Date.now(), ...entry }, ...(local.get(historyKey()) ?? [])].slice(0, 50));
+}
+
+async function copy(text, button) {
+  try {
+    await navigator.clipboard.writeText(text);
+    const label = button.textContent;
+    button.textContent = 'Copied';
+    setTimeout(() => { button.textContent = label; }, 1500);
+  } catch {}
+}
+
 $('account').addEventListener('click', () => {
   if (!state.account) return openLogin();
-  if (window.confirm('Sign out of this device? Your passkey keeps the account.')) logout();
+  render();
+  $('wallet-sheet').showModal();
+  refresh();
+});
+$('wallet-sheet').addEventListener('click', (event) => {
+  if (event.target === $('wallet-sheet') || event.target.closest('[data-close]')) $('wallet-sheet').close();
+});
+$('wallet-sheet').addEventListener('close', () => statusAt((el) => $('wallet').before(el)));
+$('top-up').addEventListener('click', () => faucet());
+$('copy-address').addEventListener('click', () => copy(state.account?.address ?? '', $('copy-address')));
+$('sign-out').addEventListener('click', () => {
+  $('wallet-sheet').close();
+  logout();
 });
 
 // ---- Balances and tier ----
@@ -272,6 +300,7 @@ async function ask(question, where) {
     const el = $(where);
     el.innerHTML = `<p class="meta">${escape(question)}</p><blockquote class="${data.refused ? 'refused' : ''}">${escape(data.answer)}</blockquote><p class="meta">${receiptLine(data, tx)}</p>`;
     el.hidden = false;
+    remember({ kind: 'ask', question, answer: String(data.answer ?? ''), refused: Boolean(data.refused), tx, refunded: Boolean(data.refund), refund: data.refund?.tx ?? null });
     busy(false);
   } catch (error) {
     busy(false);
@@ -291,11 +320,12 @@ $('ask-form').addEventListener('submit', (event) => {
 
 async function faucet(quiet = false) {
   if (!state.account) return openLogin(() => faucet());
-  statusAt((el) => $('wallet').before(el));
+  statusAt((el) => ($('wallet-sheet').open ? $('top-up').after(el) : $('wallet').before(el)));
   if (!quiet) busy(true, 'Getting $1.00 of free questions…');
   const address = state.account.address;
   try {
-    await post('/faucet', { address });
+    const sent = await post('/faucet', { address });
+    remember({ kind: 'faucet', tx: sent.tx ?? null });
     busy(false, '$1.00 added: ten questions.');
   } catch (error) {
     if (error.code === 'already_funded') {
@@ -304,6 +334,7 @@ async function faucet(quiet = false) {
       // The agent's relay is busy or down: ask Tempo's own testnet faucet directly.
       try {
         await rpc.request({ method: 'tempo_fundAddress', params: [address] });
+        remember({ kind: 'faucet', tx: null });
         busy(false, 'Free test dollars added from the Tempo faucet.');
       } catch {
         busy(false, error.message);
@@ -392,6 +423,7 @@ async function unlockWithZkpass() {
     const outcome = await submitProof(address, result, stale);
     if (stale()) return;
     if (outcome.status === 'already_claimed') return say('That Frontiers account was already used.', true);
+    if (!outcome.already) remember({ kind: 'grant', tx: outcome.tx ?? null });
     say(outcome.already ? "You're already verified for Frontiers." : outcome.grant_delayed ? 'Verified. Your ten questions are on the way.' : 'Verified: ten questions on the house, and closer answers.');
     await refresh();
   } catch (error) {
@@ -464,11 +496,44 @@ function veiledQuestion() {
   return li;
 }
 
+// One payment; a question opens to show the answer that was paid for.
+function historyItem(entry) {
+  const li = document.createElement('li');
+  const when = escape(new Date(entry.at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }));
+  const what = entry.kind === 'ask' ? escape(entry.question ?? '') : entry.kind === 'grant' ? 'Frontiers: ten questions on the house' : 'Free test dollars';
+  const amount = entry.kind === 'ask' ? (entry.refunded ? 'refunded' : '−$0.10') : '+$1.00';
+  const links = [txLink(entry.tx, 'Payment'), txLink(entry.refund, 'refund')].filter(Boolean).join(' · ');
+  const row = (tag) => `<${tag} class="row"><span class="what">${what}</span><span class="amount">${amount}</span><span class="when">${when}</span></${tag}>`;
+  li.innerHTML = entry.kind === 'ask' && typeof entry.answer === 'string'
+    ? `<details>${row('summary')}<blockquote class="${entry.refused ? 'refused' : ''}">${escape(entry.answer)}</blockquote>${links ? `<p class="links">${links}</p>` : ''}</details>`
+    : `${row('div')}${links ? `<p class="links">${links}</p>` : ''}`;
+  return li;
+}
+
+function renderWallet() {
+  if (!state.account) return;
+  const page = `${EXPLORER}/address/${state.account.address}`;
+  $('wallet-address').textContent = state.account.address;
+  $('wallet-address').href = page;
+  $('wallet-explorer').href = page;
+  $('wallet-total').textContent = money(state.toy + state.usd);
+  $('wallet-left').textContent = String((state.toy + state.usd) / PRICE);
+  $('top-up').disabled = state.busy;
+  const items = (local.get(historyKey()) ?? []).slice(0, 20).map(historyItem);
+  if (!items.length) {
+    const none = document.createElement('li');
+    none.className = 'none';
+    none.textContent = 'Nothing yet.';
+    items.push(none);
+  }
+  $('history').replaceChildren(...items);
+}
+
 const COUNT = ['', 'One question stays', 'Two questions stay', 'Three questions stay', 'Four questions stay', 'Five questions stay'];
 
 function render() {
   $('account-label').textContent = state.account ? short(state.account.address) : 'login';
-  $('account').setAttribute('aria-label', state.account ? `Signed in as ${state.account.address}. Sign out` : 'Log in with a passkey');
+  $('account').setAttribute('aria-label', state.account ? `Your account, ${state.account.address}: balance, payments and disconnect` : 'Log in with a passkey');
   $('ask').disabled = state.busy;
   $('faucet').disabled = state.busy;
 
@@ -500,11 +565,12 @@ function render() {
     : prepared ? `Continue with ${by}` : `Unlock with ${by}`;
   unlock.disabled = state.busy || state.preparing || !credential.live || !state.health?.verification;
 
-  // Top right: what you can spend (toy dollars plus test dollars), or what you start with.
+  // Top right: what you can spend (all of it test dollars to the visitor), or what you start with.
   const balance = $('balance');
   balance.textContent = state.account ? money(state.toy + state.usd) : '$1.00 to start';
-  balance.title = state.account ? `${money(state.toy)} toy dollars (Frontiers) and ${money(state.usd)} test dollars on Tempo` : 'Sign in and get $1.00 of test dollars: ten questions';
+  balance.title = state.account ? 'Test dollars on Tempo testnet' : 'Sign in and get $1.00 of test dollars: ten questions';
   $('wallet').hidden = !state.account || state.toy >= PRICE || state.usd >= PRICE;
+  renderWallet();
 }
 
 async function start() {

@@ -80,6 +80,26 @@
   <p><a id="skill" href="#">skill.md</a> for agents · <a id="attest" href="#">attestation</a></p>
 </footer>
 
+<dialog id="wallet-sheet" aria-labelledby="wallet-title">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h2 id="wallet-title">Your Tempo account</h2>
+      <button class="close" type="button" data-close aria-label="Close">×</button>
+    </div>
+    <p class="addr"><a id="wallet-address" target="_blank" rel="noopener noreferrer"></a> <button id="copy-address" class="link" type="button">Copy</button></p>
+    <dl class="balances">
+      <div><dt>Test dollars</dt><dd id="wallet-total">$0.00</dd></div>
+      <div><dt>Questions left</dt><dd id="wallet-left">0</dd></div>
+    </dl>
+    <p class="note">Test dollars come from Tempo's testnet faucet, forwarded by the agent ($1.00 a day). Frontiers attendees get $1.00 more.</p>
+    <button id="top-up" class="primary choice" type="button">Get $1.00 of test dollars</button>
+    <h3>Payments on this device</h3>
+    <ol id="history" class="history"></ol>
+    <p class="note"><a id="wallet-explorer" target="_blank" rel="noopener noreferrer">All of this account's activity on the Tempo explorer</a></p>
+    <button id="sign-out" class="secondary choice" type="button">Disconnect</button>
+  </div>
+</dialog>
+
 <dialog id="login" aria-labelledby="login-title">
   <form method="dialog" class="sheet">
     <div class="sheet-head">

@@ -127,11 +127,33 @@ footer p { margin: 0 0 8px; }
 
 dialog { border: 0; padding: 0; background: transparent; max-width: min(440px, calc(100vw - 32px)); width: 100%; }
 dialog::backdrop { background: rgba(18, 18, 17, 0.45); }
-.sheet { background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 20px; display: grid; gap: 12px; }
+.sheet { background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 20px; display: grid; gap: 12px; max-height: calc(100dvh - 32px); overflow-y: auto; }
 .sheet-head { display: flex; align-items: center; justify-content: space-between; }
 .sheet h2 { margin: 0; font: 800 26px/1.1 var(--serif); }
 .close { min-width: 44px; min-height: 44px; background: none; border: 0; font-size: 28px; line-height: 1; cursor: pointer; color: var(--ink); }
 .choice { width: 100%; }
+.sheet h3 { margin: 8px 0 0; font: 600 15px/1.3 var(--sans); }
+.sheet .note { margin: 0; }
+.addr { margin: 0; font: 400 14px/1.5 var(--mono); overflow-wrap: anywhere; }
+.addr .link { padding: 0 0 0 6px; font: 400 14px/1.5 var(--sans); }
+.balances { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0; }
+.balances div { padding: 10px 12px; border: 1px solid var(--faint); border-radius: 3px; background: #fffef8; }
+.balances dt { color: var(--soft); font-size: 14px; }
+.balances dd { margin: 2px 0 0; font: 400 20px/1.2 var(--mono); }
+.history { list-style: none; margin: 0; padding: 0; max-height: 240px; overflow-y: auto; }
+.history li { padding: 8px 0; border-top: 1px solid var(--faint); font-size: 15px; }
+.history .row { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; }
+.history summary.row { cursor: pointer; list-style: none; }
+.history summary.row::-webkit-details-marker { display: none; }
+.history summary .what::before { content: '▸ '; color: var(--soft); }
+.history details[open] summary .what::before { content: '▾ '; }
+.history blockquote { margin: 8px 0 4px; font: 800 18px/1.3 var(--serif); }
+.history blockquote.refused { color: var(--soft); }
+.history .links { margin: 0; color: var(--soft); font-size: 13px; }
+.history .what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.history .amount { font-family: var(--mono); font-size: 14px; }
+.history .when { grid-column: 1 / -1; color: var(--soft); font-size: 13px; }
+.history .none { display: block; color: var(--soft); }
 
 @media (prefers-reduced-motion: no-preference) {
   .answer { animation: rise 240ms ease-out; }
