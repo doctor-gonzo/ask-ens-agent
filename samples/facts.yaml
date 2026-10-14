@@ -19,11 +19,11 @@ facts:
   - id: at-frontiers
     tier: attendee
     question: Where are you?
-    text: Charlie is at Paradigm Frontiers this week, at Gallery 308, Fort Mason.
+    text: Charlie is at a sample venue this week.
   - id: most-alpha
     tier: attendee
     question: What book do you think has the most alpha?
     text: Charlie thinks the sample book with the most alpha is a sample title.
 location:
   public: San Francisco
-  attendee: Gallery 308, Fort Mason
+  attendee: A sample venue

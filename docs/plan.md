@@ -22,7 +22,7 @@ get free questions and see more, such as where Charlie is right now.
 | Tiers | `public` (anyone who pays) and `attendee` (verified Frontiers 2026). The payer's address decides the tier, so identity and payment are the same thing. Friends and SBTs come later; the site says SBTs can represent Reclaim proofs. |
 | Approved data | `facts.yaml` in a private GitHub repo, read by the TEE with a read-only token. Each fact names the tier allowed to hear it. Nothing else of Charlie's is reachable. |
 | Answers | Phala Confidential AI (GPU TEE). The answering model sees only the facts the asker's tier allows. Because answers are signed, a draft may only use words from the facts it cites; otherwise those facts are sent as written. A second call checks the result without seeing the question, and pattern checks catch emails, phone numbers and street addresses. A refusal is one uniform line and is refunded. |
-| Location | A "See location" button, decided in code with no model: `public` gets "San Francisco"; `attendee` gets "Gallery 308, Fort Mason". Both come from `facts.yaml`. |
+| Location | A "See location" button, decided in code with no model: `public` gets "San Francisco"; `attendee` gets the event venue. Both come from `facts.yaml`. |
 | Agents | ENSIP-26 text records point at the TEE. Agents pay with the mppx CLI (`npx mppx account create`, then `npx mppx <endpoint>/ask -J '{"question":"…"}'`). Instructions at `/skill.md`. |
 | TEE | A Phala dstack CVM. The agent's Tempo key and secrets are derived inside it (`getKey`), so the money and the token's issuer role belong to attested code. |
 | Style | The ZK Ads Frontiers theme: ivory `#F5F4EE`, near-black text, acid yellow `#DFFF38` for the main action, serif headlines, sans body, thin rules, square controls. Minimal: as few labels and small print as possible. |
@@ -74,7 +74,7 @@ facts:
     text: Charlie's favorite book is ...
 location:
   public: San Francisco
-  attendee: Gallery 308, Fort Mason
+  attendee: A sample venue
 ```
 
 ## Privacy and safety

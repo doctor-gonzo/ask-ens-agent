@@ -17,7 +17,7 @@ facts:
   - { id: secret, tier: friend, text: unknown tier }
   - { id: Bad Id, tier: public, text: bad id }
   - { id: empty, tier: public, text: "" }
-location: { public: San Francisco, attendee: "Gallery 308, Fort Mason" }
+location: { public: San Francisco, attendee: "A sample venue" }
 `;
 
 test('facts: malformed entries are dropped, tiers nest', () => {
@@ -27,7 +27,7 @@ test('facts: malformed entries are dropped, tiers nest', () => {
   assert.deepEqual(factsFor(facts, 'public').map((f) => f.id), ['favorite-book']);
   assert.deepEqual(factsFor(facts, 'attendee').map((f) => f.id), ['favorite-book', 'coffee', 'contact']);
   assert.equal(locationFor(location, 'public'), 'San Francisco');
-  assert.equal(locationFor(location, 'attendee'), 'Gallery 308, Fort Mason');
+  assert.equal(locationFor(location, 'attendee'), 'A sample venue');
   assert.equal(locationFor({ public: 'San Francisco' }, 'attendee'), 'San Francisco');
   assert.equal(factsFor(facts, 'nonsense').length, 0);
 });
@@ -36,7 +36,7 @@ test('menu: labels are public, answers stay with their tier, tiers only go down'
   const { facts, dropped } = parseFacts(`
 facts:
   - { id: where-public, tier: public, question: "Where are you?", text: "Charlie is in San Francisco." }
-  - { id: where-attendee, tier: attendee, question: "Where are you?", text: "Charlie is at Gallery 308." }
+  - { id: where-attendee, tier: attendee, question: "Where are you?", text: "Charlie is at the sample venue." }
   - { id: coffee, tier: attendee, question: "What's your coffee order?", text: "Charlie's coffee order is a cortado." }
   - { id: coffee-again, tier: attendee, question: "What's your coffee order?", text: "Charlie drinks cortados." }
   - { id: long-label, tier: public, question: "${'x'.repeat(121)}", text: "Charlie builds tools." }
@@ -61,7 +61,7 @@ facts:
   const asPublic = await answerQuestion({ question: 'Where are you?', facts: factsFor(facts, capTier('attendee', 'public')), model });
   assert.equal(asPublic.answer, 'Charlie is in San Francisco.');
   const asAttendee = await answerQuestion({ question: 'Where are you?', facts: factsFor(facts, 'attendee'), model });
-  assert.equal(asAttendee.answer, 'Charlie is at Gallery 308.');
+  assert.equal(asAttendee.answer, 'Charlie is at the sample venue.');
 });
 
 test('site: the website becomes short public facts; menu questions are told apart', () => {
