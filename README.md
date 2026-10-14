@@ -3,8 +3,8 @@
 People ask Charlie's personal agent a question and pay a dime on Tempo
 testnet. The agent runs in a TEE and answers only from facts Charlie
 approved, after a leak check; refusals are refunded. Paradigm Frontiers 2026
-attendees prove their registration with a zkPass zkTLS proof for ten free
-questions and closer answers, such as where Charlie is.
+attendees prove their registration with a Reclaim zkTLS proof for $1.00 in
+free test dollars and closer answers, such as where Charlie is.
 
 The design and its decisions are in [docs/plan.md](docs/plan.md).
 
@@ -19,13 +19,19 @@ The design and its decisions are in [docs/plan.md](docs/plan.md).
   token (TOY) that can only be sent to it, and forwards free test dollars.
 - **TEE:** the service runs in a Phala dstack container; the agent's key is
   derived inside it. Answers come from Phala Confidential AI.
-- **zkPass:** a zkTLS proof that Paradigm's `api/frontiers-2026/status` says
-  `"confirmed"` for the signed-in account, whatever sign-in method the person
-  used. TransGate (Chrome extension, iOS App Clip or Android app) makes it; the
-  TEE checks zkPass's signatures, the schema and the asker's address. The
-  schema is [docs/zkpass-schema.json](docs/zkpass-schema.json); its id and the
-  app id are public and pinned in `enclave/docker-compose.yml`. The Reclaim
-  path stays in place for when Reclaim's provider builder works.
+- **Reclaim:** a zkTLS proof that the signed-in Paradigm Frontiers account is
+  confirmed, whatever sign-in method the person used. The page opens Reclaim's
+  web portal in the same tab (no app or extension); Reclaim's AI provider finds
+  the registration status, Reclaim posts the proof to the TEE, and the visitor
+  comes back to the page. The TEE checks the attestor's signature, the session
+  and the asker's address, and that the claim shows a confirmed registration.
+  The provider was built by Reclaim's AI, so it has no request hashes; the
+  content check is the TEE's own (`aiAttendee` in `lib/reclaim.mjs`).
+- **zkPass:** the fallback, used when Reclaim isn't configured: a zkTLS proof
+  that Paradigm's `api/frontiers-2026/status` says `"confirmed"`, made with
+  TransGate (Chrome extension, iOS App Clip or Android app). The schema is
+  [docs/zkpass-schema.json](docs/zkpass-schema.json); its id and the app id
+  are public and pinned in `enclave/docker-compose.yml`.
 
 ## Run locally
 

@@ -78,6 +78,6 @@ The agent's key signs every statement as an Ethereum personal-sign message. Chec
 
 ## Notes
 
-- **Frontiers attendees:** people registered for Paradigm Frontiers 2026 can prove it with zkPass at https://agent.charliethompson.eth.link. That gives $1.00 in free test dollars; the paying address sets the tier.
+- **Frontiers attendees:** people registered for Paradigm Frontiers 2026 can prove it with Reclaim at https://agent.charliethompson.eth.link. That gives $1.00 in free test dollars; the paying address sets the tier.
 - **Attestation:** `{{API}}/attestation` is a TDX quote that binds the agent's key.
 - **Privacy:** don't put personal details about anyone in a question.
