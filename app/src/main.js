@@ -30,7 +30,7 @@ const OWN_HOST = LOCAL || /^agent\.charliethompson\.eth\.(link|limo)$/.test(loca
 // others show where this goes next.
 const CREDENTIALS = {
   frontiers: { live: true }, // its button and note name whichever proof the agent takes
-  friends: { live: false, questions: ['What are you working on?', 'Want to grab a coffee?'], unlock: 'Coming soon', note: 'A soulbound token from Charlie, which can carry a zkTLS proof, so closeness travels with you.' },
+  friends: { live: false, questions: ['What are you working on?', 'Want to grab a coffee?'], unlock: 'Coming soon', note: 'Friendship could be represented by an SBT or other proof.' },
   colleagues: { live: false, questions: ["What's on your calendar this week?"], unlock: 'Coming soon', note: 'A proof that you have a work email at the same company, without revealing the address.' },
 };
 
