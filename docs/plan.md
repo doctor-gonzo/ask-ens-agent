@@ -56,7 +56,8 @@ JSON over HTTPS. Paid routes answer `402` with an MPP challenge first.
 | `GET /verify/:session` | `pending`, `verified`, `already_claimed` or `failed` |
 | `POST /proofs/callback?session=` | Reclaim posts the proof; verified here |
 | `GET /tier/:address` | `public` or `attendee` |
-| `POST /ask` `{ question }` | Paid. `{ answer, refused, refund, tier, signature }` |
+| `GET /questions` | The question labels each tier unlocks (labels only, never answers) |
+| `POST /ask` `{ question, as? }` | Paid. `{ answer, refused, refund, tier, signature }`; `as: "public"` asks for the public answer |
 | `POST /location` | Paid. `{ location, tier }` |
 | `POST /passkeys` · `GET /passkeys/:id` | Keep a passkey's public key so a returning visitor can sign in |
 | `GET /skill.md` | How agents ask and pay |
@@ -67,6 +68,7 @@ JSON over HTTPS. Paid routes answer `402` with an MPP challenge first.
 facts:
   - id: favorite-book
     tier: public          # public | attendee
+    question: What's your favorite book?   # optional; shown on the page
     text: Charlie's favorite book is ...
 location:
   public: San Francisco

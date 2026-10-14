@@ -13,7 +13,7 @@ import { Mppx, NodeListener, tempo as mppTempo } from 'mppx/server';
 import { getAddress, isAddress } from 'viem';
 import { answerQuestion, confidentialModel, fixtureModel } from '../lib/answer.mjs';
 import { CHAIN_ID, DAILY_QUESTIONS, EXPLORER_URL, GRANT_UNITS, MAX_QUESTION_CHARS, PATHUSD, PRICE, PRICE_UNITS, TOY } from '../lib/config.mjs';
-import { createFactsSource, factsFor, locationFor } from '../lib/facts.mjs';
+import { capTier, createFactsSource, factsFor, locationFor, questionsByTier } from '../lib/facts.mjs';
 import { loadKeys } from '../lib/keys.mjs';
 import { checkProof, claimKey, reclaimConfig, SESSION_TTL_MS, startProof } from '../lib/reclaim.mjs';
 import { dayOf, openStore } from '../lib/store.mjs';
@@ -180,11 +180,12 @@ async function ask(request) {
   const question = typeof body?.question === 'string' ? body.question.trim() : '';
   if (!question || question.length > MAX_QUESTION_CHARS) throw new HttpError(400, 'bad_question', `Ask a question of up to ${MAX_QUESTION_CHARS} characters.`);
   return paid(request, 'One question for agent.charliethompson.eth', async ({ payer, currency }) => {
-    const tier = tierOf(payer);
+    const own = tierOf(payer); // sets the daily allowance
+    const tier = capTier(own, body?.as); // sets what the answer may draw on
     const day = dayOf();
     const who = payer ?? 'unknown';
     const used = store.data.questions[who]?.day === day ? store.data.questions[who].count : 0;
-    if (used >= DAILY_QUESTIONS[tier]) {
+    if (used >= DAILY_QUESTIONS[own]) {
       return signed({ answer: "That's all the questions for today.", refused: true, tier, refund: await refund(payer, currency), at: Date.now() });
     }
     store.update((data) => { data.questions[who] = { day, count: used + 1 }; });
@@ -377,6 +378,7 @@ async function route(request) {
   if (method === 'OPTIONS') return new Response(null, { status: 204 });
   if (method === 'GET' && pathname === '/health') return health();
   if (method === 'GET' && pathname === '/attestation') return attestation();
+  if (method === 'GET' && pathname === '/questions') return json(200, { tiers: questionsByTier((await facts.get()).facts) });
   if (method === 'GET' && pathname === '/skill.md') return new Response(skill.replaceAll('{{API}}', PUBLIC_URL), { headers: { 'content-type': 'text/markdown; charset=utf-8' } });
   if (method === 'POST' && pathname === '/ask') return ask(request);
   if (method === 'POST' && pathname === '/location') return location(request);

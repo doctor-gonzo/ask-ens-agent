@@ -65,4 +65,8 @@ MPPX_PRIVATE_KEY=0x… npx mppx http://localhost:8790/ask --network testnet -J '
 
 The real `facts.yaml` lives in a private repo; `samples/facts.yaml` shows the
 format. Each fact names the lowest tier allowed to hear it (`public` or
-`attendee`), and `location` has one value per tier.
+`attendee`), and `location` has one value per tier. A fact may also have a
+`question` (up to 120 characters), which the page lists as something that
+tier can ask; it is public even when the answer isn't. Give a public and an
+attendee fact the same question ("Where are you?") to show each tier its own
+answer. The page only lists facts that have one.

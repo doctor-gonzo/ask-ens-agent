@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { answerQuestion, fixtureModel, grounded } from '../lib/answer.mjs';
 import { REFUSAL } from '../lib/config.mjs';
-import { factsFor, locationFor, parseFacts } from '../lib/facts.mjs';
+import { capTier, factsFor, locationFor, parseFacts, questionsByTier } from '../lib/facts.mjs';
 import { findLeaks } from '../lib/pii.mjs';
 import { attendeeFrom, claimKey } from '../lib/reclaim.mjs';
 
@@ -29,6 +29,34 @@ test('facts: malformed entries are dropped, tiers nest', () => {
   assert.equal(locationFor(location, 'attendee'), 'Gallery 308, Fort Mason');
   assert.equal(locationFor({ public: 'San Francisco' }, 'attendee'), 'San Francisco');
   assert.equal(factsFor(facts, 'nonsense').length, 0);
+});
+
+test('menu: labels are public, answers stay with their tier, tiers only go down', async () => {
+  const { facts, dropped } = parseFacts(`
+facts:
+  - { id: where-public, tier: public, question: "Where are you?", text: "Charlie is in San Francisco." }
+  - { id: where-attendee, tier: attendee, question: "Where are you?", text: "Charlie is at Gallery 308." }
+  - { id: coffee, tier: attendee, question: "What's your coffee order?", text: "Charlie's coffee order is a cortado." }
+  - { id: coffee-again, tier: attendee, question: "What's your coffee order?", text: "Charlie drinks cortados." }
+  - { id: long-label, tier: public, question: "${'x'.repeat(121)}", text: "Charlie builds tools." }
+  - { id: odd-label, tier: public, question: 42, text: "Charlie likes maps." }
+`);
+  assert.equal(facts.length, 6);
+  assert.equal(dropped, 2); // two bad labels are dropped; their facts stay
+  assert.equal(facts.find((f) => f.id === 'long-label').question, undefined);
+  assert.deepEqual(questionsByTier(facts), { public: ['Where are you?'], attendee: ['Where are you?', "What's your coffee order?"] });
+  assert.equal(capTier('attendee', 'public'), 'public');
+  assert.equal(capTier('public', 'attendee'), 'public');
+  assert.equal(capTier('attendee', undefined), 'attendee');
+  assert.equal(capTier('attendee', 'owner'), 'attendee');
+  const model = fixtureModel();
+  // A public asker using an attendee-only label hears nothing from attendee facts.
+  const coffee = await answerQuestion({ question: "What's your coffee order?", facts: factsFor(facts, 'public'), model });
+  assert.equal(coffee.refused, true);
+  const asPublic = await answerQuestion({ question: 'Where are you?', facts: factsFor(facts, capTier('attendee', 'public')), model });
+  assert.equal(asPublic.answer, 'Charlie is in San Francisco.');
+  const asAttendee = await answerQuestion({ question: 'Where are you?', facts: factsFor(facts, 'attendee'), model });
+  assert.equal(asAttendee.answer, 'Charlie is at Gallery 308.');
 });
 
 test('leak patterns: caught unless the allowed facts say the same thing', () => {

@@ -16,46 +16,67 @@
 <body>
 <header class="top">
   <a class="name" href="./">agent.charliethompson.eth</a>
+  <div class="top-right">
+  <span id="balance" class="balance" title="Test dollars on Tempo">$1.00 to start</span>
   <button id="account" class="account" type="button" aria-haspopup="dialog">
     <svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M7.5 4.6A9 9 0 0 1 21 12v1.5"/><path d="M3 12a9 9 0 0 1 2.1-5.8"/><path d="M6 12a6 6 0 0 1 12 0v1c0 2.6-.6 5-1.7 7"/><path d="M9 12a3 3 0 0 1 6 0v1c0 3-.9 5.7-2.4 8"/><path d="M12 12v1c0 3.4-1.1 6.4-3 8.6"/><path d="M6 15.5c0 1.8-.4 3.4-1.2 4.8"/></svg>
     <span id="account-label">login</span>
   </button>
+  </div>
 </header>
 
 <main>
-  <h1><span>Ask my</span> <span>agent.</span></h1>
+  <h1><span>Ask my agent.</span></h1>
   <p class="lead">My personal AI answers from facts I approved. It runs in a TEE and charges a dime on Tempo.</p>
 
-  <form id="ask-form" class="ask" novalidate>
-    <label class="sr-only" for="question">Your question</label>
-    <textarea id="question" rows="2" maxlength="400" placeholder="What's his favorite book?" required></textarea>
-    <div class="row">
-      <button id="ask" class="primary" type="submit">Ask</button>
-      <button id="where" class="secondary" type="button">See location</button>
+  <section class="card" aria-labelledby="public-title">
+    <div class="card-head">
+      <h2 id="public-title">Anyone can ask</h2>
+      <span class="price">$0.10 each</span>
     </div>
-    <p id="status" class="status" role="status" aria-live="polite"></p>
-  </form>
+    <ul id="public-questions" class="questions"></ul>
+    <form id="ask-form" class="own" novalidate>
+      <label class="sr-only" for="question">Ask your own question</label>
+      <input id="question" maxlength="400" placeholder="Or ask your own…" autocomplete="off">
+      <button id="ask" class="primary" type="submit">Ask</button>
+    </form>
+    <div id="public-answer" class="answer" hidden aria-live="polite"></div>
+  </section>
 
-  <section id="result" class="result" hidden aria-live="polite"></section>
+  <section id="locked-card" class="card locked" aria-labelledby="locked-title">
+    <div class="card-head">
+      <h2 id="locked-title" class="lock-line">
+        <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="11" width="14" height="9" rx="1.5"/><path id="shackle" d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+        <span id="lock-word">Locked to</span>
+        <label class="sr-only" for="credential">Credential</label>
+        <select id="credential">
+          <option value="frontiers">Paradigm Frontiers attendees</option>
+          <option value="friends">Friends</option>
+          <option value="colleagues">Colleagues</option>
+        </select>
+      </h2>
+    </div>
+    <ul id="locked-questions" class="questions"></ul>
+    <p id="credential-note" class="note"></p>
+    <button id="unlock" class="secondary" type="button">Unlock with Reclaim</button>
+    <div id="locked-answer" class="answer" hidden aria-live="polite"></div>
+  </section>
+
+  <p id="status" class="status" role="status" aria-live="polite"></p>
 
   <section id="wallet" class="wallet" hidden>
-    <p id="balances" class="balances"></p>
-    <div class="row">
-      <button id="faucet" class="secondary" type="button">Get 10 free questions</button>
-      <button id="frontiers" class="secondary" type="button">I'm at Frontiers</button>
-    </div>
+    <button id="faucet" class="secondary" type="button">Get $1.00 of free questions</button>
   </section>
 
   <ol class="how">
     <li><strong>A name.</strong> agent.charliethompson.eth points to this page and to the agent, so any agent can find it.</li>
-    <li><strong>Pay per question.</strong> Your passkey is a Tempo account. Each answer costs 0.10, paid with MPP; the agent covers gas and refunds refusals.</li>
-    <li><strong>Private by design.</strong> The agent runs in a TEE and sees only facts I approved for you. A second check reads every answer before it leaves.</li>
-    <li><strong>At Frontiers?</strong> Prove your registration with a Reclaim zkTLS proof for ten free questions and closer answers, like where I am.</li>
+    <li><strong>Pay per question.</strong> Your passkey is a Tempo account. Each answer costs $0.10 in test dollars, paid with MPP; the agent covers gas and refunds refusals. You start with $1.00.</li>
+    <li><strong>Private by design.</strong> The agent runs in a TEE and sees only the facts your credentials unlock. A second check reads every answer before it leaves.</li>
+    <li><strong>Credentials unlock questions.</strong> Today: a Reclaim zkTLS proof of Paradigm Frontiers registration. Next: soulbound tokens that carry such proofs.</li>
   </ol>
 </main>
 
 <footer>
-  <p>Next: soulbound tokens that carry Reclaim proofs, so closeness travels with you.</p>
   <p><a id="skill" href="#">skill.md</a> for agents · <a id="attest" href="#">attestation</a></p>
 </footer>
 

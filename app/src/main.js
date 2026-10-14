@@ -1,6 +1,9 @@
 // The web app for agent.charliethompson.eth. A passkey is the visitor's Tempo
 // account; questions are paid with MPP (Tempo testnet), and the agent sponsors
 // the gas. Static files only, so it can live on IPFS behind the ENS name.
+//
+// Two cards: questions anyone can ask, and questions a credential unlocks
+// (today a Reclaim proof of Paradigm Frontiers registration).
 import { Receipt } from 'mppx';
 import { Mppx, tempo } from 'mppx/client';
 import { WebAuthnP256 as Passkey, PublicKey } from 'ox';
@@ -19,9 +22,17 @@ const LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
 // may create or use them (a shared IPFS gateway origin is not).
 const OWN_HOST = LOCAL || /^agent\.charliethompson\.eth\.(link|limo)$/.test(location.hostname);
 
+// What each credential would unlock. Only the Frontiers proof is live; the
+// others show where this goes next.
+const CREDENTIALS = {
+  frontiers: { live: true, unlock: 'Unlock with Reclaim', note: 'Prove your Paradigm Frontiers 2026 registration with a Reclaim zkTLS proof. You also get ten questions on the house.' },
+  friends: { live: false, questions: ['What are you working on?', 'Want to grab a coffee?'], unlock: 'Coming soon', note: 'A soulbound token from Charlie, which can carry a Reclaim proof, so closeness travels with you.' },
+  colleagues: { live: false, questions: ["What's on your calendar this week?"], unlock: 'Coming soon', note: 'A proof that you have a work email at the same company, without revealing the address.' },
+};
+
 const $ = (id) => document.getElementById(id);
 const rpc = createClient({ chain: tempoModerato, transport: http() }).extend(publicActions);
-const state = { health: null, account: null, mppx: null, tier: 'public', toy: 0n, usd: 0n };
+const state = { health: null, menu: { public: [], attendee: [] }, account: null, mppx: null, tier: 'public', toy: 0n, usd: 0n, busy: false, preparing: false };
 
 // Browser storage can be missing (private windows); the app still works without it.
 const local = {
@@ -44,7 +55,7 @@ function say(text, bad = false) {
   $('status').classList.toggle('bad', bad);
 }
 const short = (address) => `${address.slice(0, 6)}…${address.slice(-4)}`;
-const money = (units) => Number(formatUnits(units, 6)).toFixed(2);
+const money = (units) => `$${Number(formatUnits(units, 6)).toFixed(2)}`;
 const isHash = (value) => typeof value === 'string' && /^0x[0-9a-fA-F]{64}$/.test(value);
 const isAddress = (value) => typeof value === 'string' && /^0x[0-9a-fA-F]{40}$/.test(value);
 const escape = (text) => String(text).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -55,14 +66,20 @@ const cancelled = (error) => [error, error?.cause, error?.cause?.cause].some((e)
 let prepared = null;
 let pollId = 0;
 
-// ---- The agent's health: fetched until it answers and is ready ----
+// ---- The agent's health and its question menu ----
 
 async function ensureHealth() {
-  if (state.health?.ready) return state.health;
-  try {
-    state.health = await api('/health');
-  } catch {
-    return state.health;
+  if (!state.health?.ready) {
+    try { state.health = await api('/health'); } catch { return state.health; }
+  }
+  // The menu is fetched on its own (and again while empty), so a failure
+  // here never stands in the way of paying.
+  if (!state.menu.public.length && !state.menu.attendee.length) {
+    try {
+      const { tiers } = await api('/questions');
+      const labels = (list) => (Array.isArray(list) ? list.filter((q) => typeof q === 'string') : []);
+      state.menu = { public: labels(tiers?.public), attendee: labels(tiers?.attendee) };
+    } catch {}
   }
   if (state.health?.ready && state.account && !state.mppx) buildPayments();
   return state.health;
@@ -91,7 +108,6 @@ function buildPayments() {
 function useAccount(saved) {
   prepared = null;
   pollId++;
-  $('frontiers').textContent = "I'm at Frontiers";
   if (saved?.kind === 'test' && !LOCAL) saved = null;
   if (saved?.kind === 'passkey' && !OWN_HOST) saved = null;
   Object.assign(state, { toy: 0n, usd: 0n, tier: 'public', mppx: null });
@@ -143,7 +159,7 @@ async function login(choice) {
 function logout() {
   local.remove('ask:account');
   useAccount(null);
-  $('result').hidden = true;
+  for (const id of ['public-answer', 'locked-answer']) $(id).hidden = true;
   say('');
 }
 
@@ -194,7 +210,7 @@ async function paid(path, body) {
   if (!state.mppx) throw new Error("Can't reach the agent right now. Try again in a minute.");
   const pay = state.toy >= PRICE ? 'toy' : 'usd';
   if (pay === 'usd' && state.usd < PRICE) {
-    throw new Error(state.tier === 'attendee' ? 'You are out of questions for now.' : 'You are out of questions. Get ten free ones below.');
+    throw new Error(state.tier === 'attendee' ? 'You are out of questions for now.' : 'Your balance is used up. Get $1.00 more below.');
   }
   const res = await state.mppx.fetch(`${API}${path}?pay=${pay}`, {
     method: 'POST',
@@ -209,14 +225,34 @@ async function paid(path, body) {
 }
 
 function busy(on, text) {
-  for (const id of ['ask', 'where', 'faucet']) $(id).disabled = on;
+  state.busy = on;
+  render();
   say(text ?? '');
 }
 
-async function run(text, action) {
-  busy(true, text);
+function receiptLine(data, tx) {
+  const parts = [];
+  if (isHash(tx)) parts.push(txLink(tx, 'Paid $0.10'));
+  if (isHash(data.refund?.tx)) parts.push(txLink(data.refund.tx, 'refunded'));
+  else if (data.refund) parts.push('refund delayed');
+  if (data.signature && isAddress(data.signer)) parts.push(`signed by the agent (${short(data.signer)})`);
+  return parts.join(' · ');
+}
+
+// Progress and errors show next to whatever was used, so they stay in view on phones.
+const statusAt = (place) => place($('status'));
+
+// Asks one question and shows the answer inside the card it came from. The
+// public card asks for the public answer even when the asker could hear more.
+async function ask(question, where) {
+  if (!state.account) return openLogin(() => ask(question, where));
+  statusAt((el) => $(where).before(el));
+  busy(true, 'Paying $0.10 and asking…');
   try {
-    await action();
+    const { data, tx } = await paid('/ask', where === 'public-answer' ? { question, as: 'public' } : { question });
+    const el = $(where);
+    el.innerHTML = `<p class="meta">${escape(question)}</p><blockquote class="${data.refused ? 'refused' : ''}">${escape(data.answer)}</blockquote><p class="meta">${receiptLine(data, tx)}</p>`;
+    el.hidden = false;
     busy(false);
   } catch (error) {
     busy(false);
@@ -229,48 +265,19 @@ $('ask-form').addEventListener('submit', (event) => {
   event.preventDefault();
   const question = $('question').value.trim();
   if (!question) return say('Type a question first.', true);
-  if (!state.account) return openLogin(() => $('ask-form').requestSubmit());
-  run('Paying 0.10 and asking…', async () => {
-    const { data, tx } = await paid('/ask', { question });
-    show(`<blockquote class="${data.refused ? 'refused' : ''}">${escape(data.answer)}</blockquote>`, receiptLine(data, tx));
-  });
+  ask(question, 'public-answer');
 });
-
-$('where').addEventListener('click', () => {
-  if (!state.account) return openLogin(() => $('where').click());
-  run('Paying 0.10…', async () => {
-    const { data, tx } = await paid('/location', {});
-    if (data.busy) return show(`<blockquote class="refused">${escape(data.answer)}</blockquote>`, receiptLine(data, tx));
-    const place = data.location ? escape(data.location) : null;
-    const text = !place ? "Charlie hasn't shared a location." : data.tier === 'attendee' ? `Charlie is at ${place}.` : `Charlie is in ${place}.`;
-    const hint = data.tier === 'public' ? '<br>Registered for Frontiers? Prove it to see where he is at the event.' : '';
-    show(`<blockquote>${text}</blockquote>`, receiptLine(data, tx) + hint);
-  });
-});
-
-function receiptLine(data, tx) {
-  const parts = [];
-  if (isHash(tx)) parts.push(txLink(tx, 'Paid 0.10'));
-  if (isHash(data.refund?.tx)) parts.push(txLink(data.refund.tx, 'refunded'));
-  else if (data.refund) parts.push('refund delayed');
-  if (data.signature && isAddress(data.signer)) parts.push(`signed by the agent (${short(data.signer)})`);
-  return parts.join(' · ');
-}
-
-function show(html, meta) {
-  $('result').innerHTML = `${html}<p class="meta">${meta}</p>`;
-  $('result').hidden = false;
-}
 
 // ---- Free questions (forwarded from the Tempo faucet) ----
 
 async function faucet(quiet = false) {
   if (!state.account) return openLogin(() => faucet());
-  if (!quiet) busy(true, 'Getting ten free questions…');
+  statusAt((el) => $('wallet').before(el));
+  if (!quiet) busy(true, 'Getting $1.00 of free questions…');
   const address = state.account.address;
   try {
     await post('/faucet', { address });
-    busy(false, 'Ten free questions added.');
+    busy(false, '$1.00 added: ten questions.');
   } catch (error) {
     if (error.code === 'already_funded') {
       busy(false, 'This account already got its free questions today.');
@@ -288,22 +295,25 @@ async function faucet(quiet = false) {
 }
 $('faucet').addEventListener('click', () => faucet());
 
-// ---- Frontiers attendance (Reclaim) ----
+// ---- Unlocking with a credential (Reclaim, for Frontiers) ----
 // Two clicks: the first prepares the proof request; the second opens Reclaim
 // straight from the click, so browsers don't block it as a popup.
 
-$('frontiers').addEventListener('click', async () => {
-  if (!state.account) return openLogin(() => $('frontiers').click());
+$('unlock').addEventListener('click', async () => {
+  if ($('credential').value !== 'frontiers' || state.preparing) return;
+  if (!state.account) return openLogin(() => $('unlock').click());
+  statusAt((el) => $('unlock').after(el));
   if (prepared) {
     const { request, session, url } = prepared;
     prepared = null;
-    $('frontiers').textContent = "I'm at Frontiers";
+    render();
     request.triggerReclaimFlow().catch(() => {});
     const link = /^https:\/\//.test(url ?? '') ? ` No window? <a href="${escape(url)}" target="_blank" rel="noopener noreferrer">Open Reclaim</a>.` : '';
     $('status').innerHTML = `Sign in to your Frontiers account in the Reclaim window, then come back here.${link}`;
     return waitForProof(session);
   }
-  $('frontiers').disabled = true;
+  state.preparing = true; // held until the request is ready, whatever renders meanwhile
+  render();
   say('Preparing your Reclaim proof…');
   try {
     const address = state.account.address;
@@ -313,12 +323,12 @@ $('frontiers').addEventListener('click', async () => {
     const request = await ReclaimProofRequest.fromJsonString(start.request);
     if (state.account?.address !== address) return; // signed out meanwhile
     prepared = { session: start.session, url: start.request_url, request };
-    $('frontiers').textContent = 'Continue with Reclaim';
     say('Ready. Continue to prove your Frontiers registration with Reclaim.');
   } catch (error) {
     say(error.message, true);
   } finally {
-    $('frontiers').disabled = false;
+    state.preparing = false;
+    render();
   }
 });
 
@@ -343,24 +353,60 @@ async function waitForProof(session) {
   if (mine === pollId) say('The proof took too long. Try again.', true);
 }
 
+$('credential').addEventListener('change', () => {
+  $('locked-answer').hidden = true; // an answer belongs to the credential that got it
+  render();
+});
+
 // ---- Rendering ----
+
+function questionButton(question, { locked, where }) {
+  const li = document.createElement('li');
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'q';
+  button.disabled = locked || state.busy;
+  button.innerHTML = `<span>${escape(question)}</span><span class="go">${locked ? 'locked' : 'ask · $0.10'}</span>`;
+  if (!locked) button.addEventListener('click', () => ask(question, where));
+  li.append(button);
+  return li;
+}
 
 function render() {
   $('account-label').textContent = state.account ? short(state.account.address) : 'login';
   $('account').setAttribute('aria-label', state.account ? `Signed in as ${state.account.address}. Sign out` : 'Log in with a passkey');
-  $('wallet').hidden = !state.account;
-  if (state.account) {
-    const parts = [`${money(state.toy)} TOY`, `${money(state.usd)} pathUSD`, state.tier === 'attendee' ? 'Frontiers attendee' : 'public'];
-    $('balances').textContent = parts.join(' · ');
-    $('frontiers').hidden = state.tier === 'attendee' || !state.health?.verification;
-    $('faucet').hidden = state.toy >= PRICE || state.usd >= PRICE;
-    $('wallet').querySelector('.row').hidden = $('frontiers').hidden && $('faucet').hidden;
-  }
-  $('ask').textContent = 'Ask · 0.10';
+  $('ask').disabled = state.busy;
+  $('faucet').disabled = state.busy;
+
+  // Anyone can ask these.
+  $('public-questions').replaceChildren(...state.menu.public.map((q) => questionButton(q, { locked: false, where: 'public-answer' })));
+
+  // The credential card: the chosen credential's questions, locked until held.
+  const key = $('credential').value;
+  const credential = CREDENTIALS[key];
+  const held = key === 'frontiers' && state.tier === 'attendee';
+  const questions = key === 'frontiers' ? state.menu.attendee : credential.questions;
+  $('locked-card').classList.toggle('unlocked', held);
+  $('lock-word').textContent = held ? 'Unlocked for' : 'Locked to';
+  $('shackle').setAttribute('d', held ? 'M8 11V8a4 4 0 0 1 7.6-1.8' : 'M8 11V8a4 4 0 0 1 8 0v3');
+  $('locked-questions').replaceChildren(...questions.map((q) => questionButton(q, { locked: !held, where: 'locked-answer' })));
+  $('credential-note').textContent = held ? '' : credential.note;
+  const unlock = $('unlock');
+  unlock.hidden = held;
+  unlock.textContent = key === 'frontiers' && prepared ? 'Continue with Reclaim' : credential.unlock;
+  unlock.disabled = state.busy || state.preparing || !credential.live || !state.health?.verification;
+  if (key === 'frontiers' && !state.health?.verification) unlock.textContent = 'Unlock with Reclaim (opening soon)';
+
+  // Top right: what you can spend (toy dollars plus test dollars), or what you start with.
+  const balance = $('balance');
+  balance.textContent = state.account ? money(state.toy + state.usd) : '$1.00 to start';
+  balance.title = state.account ? `${money(state.toy)} toy dollars (Frontiers) and ${money(state.usd)} test dollars on Tempo` : 'Sign in and get $1.00 of test dollars: ten questions';
+  $('wallet').hidden = !state.account || state.toy >= PRICE || state.usd >= PRICE;
 }
 
 async function start() {
   for (const [id, path] of [['skill', '/skill.md'], ['attest', '/attestation']]) $(id).href = `${API}${path}`;
+  render();
   await ensureHealth();
   if (!state.health) say("Can't reach the agent right now.", true);
   else if (!state.health.ready) say('The agent is starting up on Tempo; try again in a minute.');
