@@ -90,6 +90,10 @@ h1 span { display: inline-block; background: var(--ink); color: var(--bg); paddi
 .note { margin: 10px 0 12px; color: var(--soft); font-size: 15px; }
 .note:empty { display: none; }
 .locked #unlock { width: 100%; }
+/* A hidden question: a bar where its words would be. */
+.q.veiled { cursor: default; }
+.q .bar { display: block; flex: 0 1 62%; height: 0.9em; border-radius: 2px; background: var(--faint); }
+.questions li:nth-child(even) .q .bar { flex-basis: 44%; }
 
 input:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
 

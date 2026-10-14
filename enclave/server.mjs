@@ -12,7 +12,7 @@ import { Credential } from 'mppx';
 import { Mppx, NodeListener, tempo as mppTempo } from 'mppx/server';
 import { getAddress, isAddress } from 'viem';
 import { answerQuestion, confidentialModel, fixtureModel } from '../lib/answer.mjs';
-import { CHAIN_ID, DAILY_QUESTIONS, EXPLORER_URL, GRANT_UNITS, MAX_QUESTION_CHARS, PATHUSD, PRICE, PRICE_UNITS, TOY } from '../lib/config.mjs';
+import { CHAIN_ID, DAILY_QUESTIONS, EXPLORER_URL, GRANT_UNITS, MAX_QUESTION_CHARS, PATHUSD, PRICE, PRICE_UNITS, TIERS, TOY } from '../lib/config.mjs';
 import { capTier, createFactsSource, factsFor, locationFor, questionsByTier } from '../lib/facts.mjs';
 import { loadKeys } from '../lib/keys.mjs';
 import { checkProof, claimKey, reclaimConfig, SESSION_TTL_MS, startProof } from '../lib/reclaim.mjs';
@@ -361,6 +361,23 @@ async function savePasskey(request) {
   return json(200, { ok: true });
 }
 
+// ---- The question menu: labels only, and only up to the asker's tier ----
+
+// Questions above an account's tier stay hidden (only how many there are is
+// shown) until the account is admitted to that tier.
+async function questions(forAddress) {
+  const rank = TIERS.indexOf(tierOf(addressOf(forAddress)));
+  const menu = questionsByTier((await facts.get()).facts);
+  const tiers = {};
+  const hidden = {};
+  for (const [tier, labels] of Object.entries(menu)) {
+    const open = TIERS.indexOf(tier) <= rank;
+    tiers[tier] = open ? labels : [];
+    hidden[tier] = open ? 0 : labels.length;
+  }
+  return json(200, { tiers, hidden });
+}
+
 // ---- Attestation: inside the CVM, a TDX quote over what this agent is ----
 
 async function attestation() {
@@ -409,7 +426,7 @@ async function route(request) {
   if (method === 'OPTIONS') return new Response(null, { status: 204 });
   if (method === 'GET' && pathname === '/health') return health();
   if (method === 'GET' && pathname === '/attestation') return attestation();
-  if (method === 'GET' && pathname === '/questions') return json(200, { tiers: questionsByTier((await facts.get()).facts) });
+  if (method === 'GET' && pathname === '/questions') return questions(searchParams.get('for'));
   if (method === 'GET' && pathname === '/skill.md') return new Response(skill.replaceAll('{{API}}', PUBLIC_URL), { headers: { 'content-type': 'text/markdown; charset=utf-8' } });
   if (method === 'POST' && pathname === '/ask') return ask(request);
   if (method === 'POST' && pathname === '/location') return location(request);

@@ -34,7 +34,7 @@ const CREDENTIALS = {
 
 const $ = (id) => document.getElementById(id);
 const rpc = createClient({ chain: tempoModerato, transport: http() }).extend(publicActions);
-const state = { health: null, menu: { public: [], attendee: [] }, account: null, mppx: null, tier: 'public', toy: 0n, usd: 0n, busy: false, preparing: false };
+const state = { health: null, menu: { public: [], attendee: [] }, hidden: { attendee: 0 }, menuFor: null, account: null, mppx: null, tier: 'public', toy: 0n, usd: 0n, busy: false, preparing: false };
 
 // Browser storage can be missing (private windows); the app still works without it.
 const local = {
@@ -76,17 +76,25 @@ async function ensureHealth() {
   if (!state.health?.ready) {
     try { state.health = await api('/health'); } catch { return state.health; }
   }
-  // The menu is fetched on its own (and again while empty), so a failure
-  // here never stands in the way of paying.
-  if (!state.menu.public.length && !state.menu.attendee.length) {
-    try {
-      const { tiers } = await api('/questions');
-      const labels = (list) => (Array.isArray(list) ? list.filter((q) => typeof q === 'string') : []);
-      state.menu = { public: labels(tiers?.public), attendee: labels(tiers?.attendee) };
-    } catch {}
-  }
   if (state.health?.ready && state.account && !state.mppx) buildPayments();
   return state.health;
+}
+
+// The menu depends on who's asking: questions above your tier stay hidden
+// (the agent only says how many) until you're admitted. It is fetched on its
+// own, so a failure here never stands in the way of paying.
+async function loadMenu() {
+  const address = state.account?.address ?? '';
+  const key = `${address}:${state.tier}`;
+  if (state.menuFor === key) return;
+  try {
+    const { tiers, hidden } = await api(`/questions${address ? `?for=${address}` : ''}`);
+    if ((state.account?.address ?? '') !== address) return;
+    const labels = (list) => (Array.isArray(list) ? list.filter((q) => typeof q === 'string') : []);
+    state.menu = { public: labels(tiers?.public), attendee: labels(tiers?.attendee) };
+    state.hidden = { attendee: Number.isInteger(hidden?.attendee) ? Math.max(0, Math.min(hidden.attendee, 12)) : 0 };
+    state.menuFor = key;
+  } catch {}
 }
 
 // ---- Account: a passkey (or, on localhost, a throwaway test key) ----
@@ -116,7 +124,8 @@ function useAccount(saved) {
   state.preparing = false;
   if (saved?.kind === 'test' && !LOCAL) saved = null;
   if (saved?.kind === 'passkey' && !OWN_HOST) saved = null;
-  Object.assign(state, { toy: 0n, usd: 0n, tier: 'public', mppx: null });
+  // A new account sees only what it has unlocked, so the old menu goes too.
+  Object.assign(state, { toy: 0n, usd: 0n, tier: 'public', mppx: null, menuFor: null, menu: { ...state.menu, attendee: [] } });
   state.account = !saved ? null : saved.kind === 'test' ? privateKeyToAccount(saved.key) : Account.fromWebAuthnP256({ id: saved.id, publicKey: saved.publicKey }, { rpId: RP_ID });
   buildPayments();
   render();
@@ -199,13 +208,15 @@ $('account').addEventListener('click', () => {
 
 async function refresh() {
   await ensureHealth();
-  if (!state.account || !state.health?.ready) return render();
-  const address = state.account.address;
-  const balance = (token) => rpc.readContract({ address: token, abi: Abis.tip20, functionName: 'balanceOf', args: [address] });
-  try {
-    const [toy, usd, tier] = await Promise.all([balance(state.health.tokens.toy), balance(PATHUSD), api(`/tier/${address}`)]);
-    if (state.account?.address === address) Object.assign(state, { toy, usd, tier: tier.tier });
-  } catch {}
+  if (state.account && state.health?.ready) {
+    const address = state.account.address;
+    const balance = (token) => rpc.readContract({ address: token, abi: Abis.tip20, functionName: 'balanceOf', args: [address] });
+    try {
+      const [toy, usd, tier] = await Promise.all([balance(state.health.tokens.toy), balance(PATHUSD), api(`/tier/${address}`)]);
+      if (state.account?.address === address) Object.assign(state, { toy, usd, tier: tier.tier });
+    } catch {}
+  }
+  await loadMenu();
   render();
 }
 
@@ -446,6 +457,15 @@ function questionButton(question, { locked, where }) {
   return li;
 }
 
+// A question the agent hasn't revealed yet: a bar where its words would be.
+function veiledQuestion() {
+  const li = document.createElement('li');
+  li.innerHTML = '<span class="q veiled"><span class="bar" aria-hidden="true"></span><span class="sr-only">A hidden question</span><span class="go">hidden</span></span>';
+  return li;
+}
+
+const COUNT = ['', 'One question stays', 'Two questions stay', 'Three questions stay', 'Four questions stay', 'Five questions stay'];
+
 function render() {
   $('account-label').textContent = state.account ? short(state.account.address) : 'login';
   $('account').setAttribute('aria-label', state.account ? `Signed in as ${state.account.address}. Sign out` : 'Log in with a passkey');
@@ -463,9 +483,14 @@ function render() {
   $('locked-card').classList.toggle('unlocked', held);
   $('lock-word').textContent = held ? 'Unlocked for' : 'Locked to';
   $('shackle').setAttribute('d', held ? 'M8 11V8a4 4 0 0 1 7.6-1.8' : 'M8 11V8a4 4 0 0 1 8 0v3');
-  $('locked-questions').replaceChildren(...questions.map((q) => questionButton(q, { locked: !held, where: 'locked-answer' })));
+  const veiled = key === 'frontiers' && !held ? state.hidden.attendee : 0;
+  $('locked-questions').replaceChildren(
+    ...questions.map((q) => questionButton(q, { locked: !held, where: 'locked-answer' })),
+    ...Array.from({ length: veiled }, veiledQuestion),
+  );
   const by = provider();
-  const note = key === 'frontiers' ? `Prove your Paradigm Frontiers 2026 registration with a ${by} zkTLS proof. You also get ten questions on the house.` : credential.note;
+  const lead = veiled ? `${COUNT[veiled] ?? `${veiled} questions stay`} hidden until you prove` : 'Prove';
+  const note = key === 'frontiers' ? `${lead} your Paradigm Frontiers 2026 registration with a ${by} zkTLS proof. You also get ten questions on the house.` : credential.note;
   $('credential-note').textContent = held ? '' : note;
   const unlock = $('unlock');
   unlock.hidden = held;

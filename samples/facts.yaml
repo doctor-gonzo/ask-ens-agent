@@ -1,17 +1,18 @@
-# Fictional sample facts for development. The real file lives in a private
-# repo. Each fact names the lowest tier allowed to hear it:
+# Sample facts for development, shaped like the real ones; the real file
+# lives in a private repo. Each fact names the lowest tier allowed to hear it:
 #   public    anyone who pays a dime
 #   attendee  someone who proved they're registered for Paradigm Frontiers 2026
-# An optional `question` is shown on the page as something that tier can ask.
+# An optional `question` is shown on the page as something that tier can ask
+# (questions above a visitor's tier stay hidden until they're admitted).
 facts:
   - id: home-city
     tier: public
     question: Where are you?
     text: Charlie is in San Francisco.
-  - id: favorite-book
+  - id: books-read
     tier: public
-    question: What's your favorite book?
-    text: Charlie's favorite book is The Dispossessed by Ursula K. Le Guin.
+    question: What books have you read in the last two years?
+    text: In the last two years Charlie has read a sample list of books.
   - id: building
     tier: public
     text: Charlie builds tools for privacy, coordination and better ways to work with AI.
@@ -19,10 +20,10 @@ facts:
     tier: attendee
     question: Where are you?
     text: Charlie is at Paradigm Frontiers this week, at Gallery 308, Fort Mason.
-  - id: coffee
+  - id: most-alpha
     tier: attendee
-    question: What's your coffee order?
-    text: Charlie's go-to coffee order is a cortado.
+    question: What book do you think has the most alpha?
+    text: Charlie thinks the sample book with the most alpha is a sample title.
 location:
   public: San Francisco
   attendee: Gallery 308, Fort Mason
