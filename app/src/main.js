@@ -556,8 +556,6 @@ function renderHistory() {
   $('history').replaceChildren(...items);
 }
 
-const COUNT = ['', 'One question stays', 'Two questions stay', 'Three questions stay', 'Four questions stay', 'Five questions stay'];
-
 function render() {
   $('account-label').textContent = state.account ? short(state.account.address) : 'login';
   $('account').setAttribute('aria-label', state.account ? `Your account, ${state.account.address}: balance, payments and disconnect` : 'Log in with a passkey');
@@ -581,9 +579,8 @@ function render() {
     ...Array.from({ length: veiled }, veiledQuestion),
   );
   const by = provider();
-  const lead = veiled ? `${COUNT[veiled] ?? `${veiled} questions stay`} hidden until you prove` : 'Prove';
-  const note = key === 'frontiers' ? `${lead} your Paradigm Frontiers 2026 registration with a ${by} zkTLS proof. You also get ten questions on the house.` : credential.note;
-  $('credential-note').textContent = held ? '' : note;
+  // The blank rows and the button say it for Frontiers; the coming-soon credentials explain themselves.
+  $('credential-note').textContent = held || key === 'frontiers' ? '' : credential.note;
   const unlock = $('unlock');
   unlock.hidden = held;
   unlock.textContent = key !== 'frontiers' ? credential.unlock
