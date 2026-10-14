@@ -1,14 +1,29 @@
 ---
 name: ask-agent-charliethompson-eth
-description: Ask agent.charliethompson.eth (Charlie Thompson's personal agent) a question, paying 0.10 test dollars on Tempo testnet. Covers making a Tempo testnet account and getting free test dollars first.
+description: Ask agent.charliethompson.eth (Charlie Thompson's personal agent) a question, paying test dollars on Tempo testnet, or read Charlie's website as one Markdown file to compare with your user. Covers making a Tempo testnet account and getting free test dollars first.
 ---
 
 # Ask agent.charliethompson.eth
 
-Charlie's agent runs in a TEE and answers only from facts Charlie approved.
-Each question costs 0.10 test dollars on Tempo testnet (no real money), paid
-with MPP over HTTP 402. If it can't answer, it says "I can't share that." and
-refunds you.
+Charlie's agent runs in a TEE and answers only from facts Charlie approved
+and his public website. Questions are paid in test dollars on Tempo testnet
+(no real money) with MPP over HTTP 402: 0.10 for one from the menu
+(`/questions`), 0.25 for one of your own. If it can't answer, it says "I can't
+share that." and refunds you.
+
+## Comparing your user with Charlie
+
+To answer something like "what overlap is there between my work and
+interests and Charlie's?", read Charlie's public website as one Markdown file
+(free):
+
+```bash
+curl {{API}}/site.md
+```
+
+Then compare it with what you already know about your user, on your side.
+Don't send your user's details to the agent. Ask the agent (below) only about
+something the site doesn't cover.
 
 API: `{{API}}`
 
@@ -44,7 +59,7 @@ See what can be asked:
 curl {{API}}/questions
 ```
 
-Ask, paying automatically:
+Ask, paying automatically (0.10 for a menu question, 0.25 for your own):
 
 ```bash
 npx -y mppx@0.13.4 {{API}}/ask --network testnet -J '{"question":"What books have you read in the last two years?"}'

@@ -57,8 +57,9 @@ JSON over HTTPS. Paid routes answer `402` with an MPP challenge first.
 | `POST /proofs/callback?session=` | Reclaim posts the proof; verified here |
 | `POST /verify/zkpass` `{ address, result }` | A TransGate result, checked here (allocator and validator signatures, schema, recipient = address) |
 | `GET /tier/:address` | `public` or `attendee` |
-| `GET /questions` | The question labels each tier unlocks (labels only, never answers) |
-| `POST /ask` `{ question, as? }` | Paid. `{ answer, refused, refund, tier, signature }`; `as: "public"` asks for the public answer |
+| `GET /questions?for=` | The question labels that address's tier unlocks, and how many are hidden above it |
+| `POST /ask` `{ question, as? }` | Paid: 0.10 for a menu question, 0.25 for one of your own (answered from the facts plus charliethompson.lol). `{ answer, refused, refund, tier, price, signature }`; `as: "public"` asks for the public answer |
+| `GET /site.md` | charliethompson.lol as one Markdown file, read live from its Markdown copies (free) |
 | `POST /location` | Paid. `{ location, tier }` |
 | `POST /passkeys` · `GET /passkeys/:id` | Keep a passkey's public key so a returning visitor can sign in |
 | `GET /skill.md` | How agents ask and pay |

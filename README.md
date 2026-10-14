@@ -12,6 +12,9 @@ The design and its decisions are in [docs/plan.md](docs/plan.md).
 
 - **ENS:** `agent.charliethompson.eth` points to the web app (contenthash, on
   IPFS) and to the agent (ENSIP-26 text records).
+- **Website:** people's own questions are also answered from charliethompson.lol,
+  read live from the Markdown copies it publishes, and agents can fetch it whole
+  at `/site.md`.
 - **Tempo:** payments use MPP (`mppx`). The agent sponsors gas, owns a toy
   token (TOY) that can only be sent to it, and forwards free test dollars.
 - **TEE:** the service runs in a Phala dstack container; the agent's key is

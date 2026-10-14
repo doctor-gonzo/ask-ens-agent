@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { answerQuestion, fixtureModel, grounded } from '../lib/answer.mjs';
 import { REFUSAL } from '../lib/config.mjs';
-import { capTier, factsFor, locationFor, menuFor, parseFacts, questionsByTier } from '../lib/facts.mjs';
+import { capTier, factsFor, isListed, locationFor, menuFor, parseFacts, questionsByTier } from '../lib/facts.mjs';
+import { siteFacts } from '../lib/site.mjs';
 import { findLeaks } from '../lib/pii.mjs';
 import { attendeeFrom, claimKey } from '../lib/reclaim.mjs';
 
@@ -61,6 +62,19 @@ facts:
   assert.equal(asPublic.answer, 'Charlie is in San Francisco.');
   const asAttendee = await answerQuestion({ question: 'Where are you?', facts: factsFor(facts, 'attendee'), model });
   assert.equal(asAttendee.answer, 'Charlie is at Gallery 308.');
+});
+
+test('site: the website becomes short public facts; menu questions are told apart', () => {
+  const long = `${'Charlie works on quantum risk to Bitcoin. '.repeat(20)}`.trim();
+  const facts = siteFacts(`# Charlie Thompson\n\nShort intro.\n\nSource: https://example.com\n\n${long}\n\n---\n\nLast line.`);
+  assert.ok(facts.length >= 2);
+  assert.ok(facts.every((fact) => fact.tier === 'public' && /^site-\d+$/.test(fact.id) && fact.text.length <= 450 && fact.text.length > 0));
+  assert.equal(facts[0].text, '# Charlie Thompson Short intro.');
+  assert.ok(!facts.some((fact) => /^(source|---)/i.test(fact.text)));
+  assert.equal(siteFacts('').length, 0);
+  const { facts: menu } = parseFacts('facts:\n  - { id: where, tier: public, question: "Where are you?", text: "Charlie is in San Francisco." }\n');
+  assert.equal(isListed(menu, '  where are you? '), true);
+  assert.equal(isListed(menu, "What is Charlie's most contrarian position?"), false);
 });
 
 test('leak patterns: caught unless the allowed facts say the same thing', () => {

@@ -35,8 +35,8 @@
     <ul id="public-questions" class="questions"></ul>
     <form id="ask-form" class="own" novalidate>
       <label class="sr-only" for="question">Ask your own question</label>
-      <input id="question" maxlength="400" placeholder="Or ask your own…" autocomplete="off">
-      <button id="ask" class="primary" type="submit">Ask</button>
+      <input id="question" maxlength="400" placeholder="What is Charlie's most contrarian position?" autocomplete="off">
+      <button id="ask" class="primary" type="submit">Ask · $0.25</button>
     </form>
     <div id="public-answer" class="answer" hidden aria-live="polite"></div>
   </section>
@@ -68,14 +68,14 @@
 
   <ul class="how">
     <li><a class="logo" href="https://ens.domains" target="_blank" rel="noopener noreferrer"><img src="logos/ens.svg" alt="ENS" width="28" height="28"></a><p><strong>A name, on ENS.</strong> agent.charliethompson.eth points to this page and to the agent, so any agent can find it.</p></li>
-    <li><a class="logo" href="https://tempo.xyz" target="_blank" rel="noopener noreferrer"><img src="logos/tempo.svg" alt="Tempo" width="28" height="28"></a><p><strong>Pay per question, on Tempo.</strong> Your passkey is a Tempo account. Each answer costs $0.10 in test dollars, paid with MPP; the agent covers gas and refunds refusals. You start with $1.00.</p></li>
+    <li><a class="logo" href="https://tempo.xyz" target="_blank" rel="noopener noreferrer"><img src="logos/tempo.svg" alt="Tempo" width="28" height="28"></a><p><strong>Pay per question, on Tempo.</strong> Your passkey is a Tempo account. Answers cost $0.10, or $0.25 for a question of your own (it can draw on Charlie's website), in test dollars paid with MPP; the agent covers gas and refunds refusals. You start with $1.00.</p></li>
     <li><a class="logo" href="https://phala.com" target="_blank" rel="noopener noreferrer"><img src="logos/phala.svg" alt="Phala" width="28" height="28"></a><p><strong>Private by design, in a Phala TEE.</strong> The agent sees only the facts your credentials unlock, and a second check reads every answer before it leaves.</p></li>
     <li><a class="logo" href="https://zkpass.org" target="_blank" rel="noopener noreferrer"><img src="logos/zkpass.svg" alt="zkPass" width="28" height="28"></a><p><strong>Credentials unlock questions, with zkPass.</strong> Today: a zkTLS proof of Paradigm Frontiers registration, checked inside the TEE. Next: soulbound tokens that carry such proofs.</p></li>
   </ul>
 
   <section class="agents" aria-labelledby="agents-title">
     <h2 id="agents-title">Ask from your agent</h2>
-    <p>Paste this into Claude Code or any agent that can run commands. It makes its own Tempo account, gets free test dollars and pays per question.</p>
+    <p>Paste this into Claude Code or any agent that can run commands. It reads Charlie's site as one Markdown file, compares it with what it knows about you on your side, and can make its own Tempo account to pay for questions.</p>
     <div class="prompt"><code id="agent-prompt"></code><button id="copy-prompt" class="secondary" type="button">Copy</button></div>
   </section>
 </main>

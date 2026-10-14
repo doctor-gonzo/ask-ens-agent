@@ -12,10 +12,11 @@ import { Credential } from 'mppx';
 import { Mppx, NodeListener, tempo as mppTempo } from 'mppx/server';
 import { getAddress, isAddress } from 'viem';
 import { answerQuestion, confidentialModel, fixtureModel } from '../lib/answer.mjs';
-import { CHAIN_ID, DAILY_QUESTIONS, EXPLORER_URL, GRANT_UNITS, MAX_QUESTION_CHARS, PATHUSD, PRICE, PRICE_UNITS, TOY } from '../lib/config.mjs';
-import { capTier, createFactsSource, factsFor, locationFor, menuFor } from '../lib/facts.mjs';
+import { CHAIN_ID, DAILY_QUESTIONS, EXPLORER_URL, GRANT_UNITS, MAX_QUESTION_CHARS, OWN_PRICE, OWN_PRICE_UNITS, PATHUSD, PRICE, PRICE_UNITS, TOY } from '../lib/config.mjs';
+import { capTier, createFactsSource, factsFor, isListed, locationFor, menuFor } from '../lib/facts.mjs';
 import { loadKeys } from '../lib/keys.mjs';
 import { checkProof, claimKey, reclaimConfig, SESSION_TTL_MS, startProof } from '../lib/reclaim.mjs';
+import { createSiteSource } from '../lib/site.mjs';
 import { dayOf, openStore } from '../lib/store.mjs';
 import { createTempo } from '../lib/tempo.mjs';
 import { checkZkpass, zkpassConfig } from '../lib/zkpass.mjs';
@@ -33,6 +34,9 @@ const store = openStore(DATA_DIR);
 const tempo = createTempo({ privateKey: keys.agent, ...(env.TEMPO_RPC_URL ? { rpcUrl: env.TEMPO_RPC_URL } : {}) });
 const AGENT = tempo.account.address;
 const facts = createFactsSource({ file: env.FACTS_FILE, repo: env.FACTS_REPO, path: env.FACTS_PATH || 'facts.yaml', token: env.FACTS_TOKEN });
+const site = createSiteSource(env.SITE_URL ? { base: env.SITE_URL } : {}); // charliethompson.lol, public already
+const LISTED = { amount: PRICE, units: PRICE_UNITS };
+const OWN = { amount: OWN_PRICE, units: OWN_PRICE_UNITS };
 const model = env.MODEL === 'fixture' ? fixtureModel() : confidentialModel({ apiKey: env.CONFIDENTIAL_AI_KEY, ...(env.CONFIDENTIAL_AI_URL ? { baseUrl: env.CONFIDENTIAL_AI_URL } : {}), ...(env.MODEL ? { model: env.MODEL } : {}) });
 const zkpass = zkpassConfig(env);
 // One proof provider at a time: a Reclaim identity and a zkPass one can't be
@@ -92,7 +96,7 @@ async function retryDelayed() {
     }
     for (const item of [...(store.data.failedRefunds ?? [])]) {
       try {
-        await tempo.refund({ currency: item.currency, toyToken, to: item.payer, amount: PRICE_UNITS });
+        await tempo.refund({ currency: item.currency, toyToken, to: item.payer, amount: BigInt(item.units ?? PRICE_UNITS) });
         store.update((data) => { data.failedRefunds = data.failedRefunds.filter((r) => r !== item); });
       } catch {}
     }
@@ -125,8 +129,8 @@ function paymentCredential(request) {
 }
 const payerOf = (credential) => addressOf(String(credential?.source ?? '').split(':').pop());
 
-// Charges one price, then runs `work` with the payer and the token paid in.
-async function paid(request, description, work) {
+// Charges `price`, then runs `work` with the payer and the token paid in.
+async function paid(request, description, work, price = LISTED) {
   if (!payments) throw new HttpError(503, 'starting', 'The agent is still setting up on Tempo; try again in a minute.');
   // Checked before mppx settles anything, so a turned-away request costs
   // nothing: the payer must be named (it sets the tier and receives refunds).
@@ -143,7 +147,7 @@ async function paid(request, description, work) {
   if (offered) settling++;
   let result;
   try {
-    result = await payments[pay].charge({ amount: PRICE, description })(request.clone());
+    result = await payments[pay].charge({ amount: price.amount, description })(request.clone());
   } finally {
     if (offered) settling--;
   }
@@ -157,19 +161,19 @@ async function paid(request, description, work) {
   try {
     limit('paid:minute', 60, 60_000);
   } catch {
-    return result.withReceipt(json(200, await signed({ busy: true, refused: true, answer: 'The agent is busy right now; try again in a minute.', refund: await refund(payer, currency), at: Date.now() })));
+    return result.withReceipt(json(200, await signed({ busy: true, refused: true, answer: 'The agent is busy right now; try again in a minute.', refund: await refund(payer, currency, price), at: Date.now() })));
   }
   return result.withReceipt(json(200, await work({ payer, currency })));
 }
 
-async function refund(payer, currency) {
+async function refund(payer, currency, price = LISTED) {
   if (!payer) return null;
   try {
-    return { amount: PRICE, tx: await tempo.refund({ currency, toyToken, to: payer, amount: PRICE_UNITS }) };
+    return { amount: price.amount, tx: await tempo.refund({ currency, toyToken, to: payer, amount: price.units }) };
   } catch (error) {
     console.error(`Refund failed: ${error.shortMessage ?? error.message}`);
-    store.update((data) => { (data.failedRefunds ??= []).push({ payer, currency, at: Date.now() }); });
-    return { amount: PRICE, tx: null, error: 'The refund is delayed.' };
+    store.update((data) => { (data.failedRefunds ??= []).push({ payer, currency, units: String(price.units), at: Date.now() }); });
+    return { amount: price.amount, tx: null, error: 'The refund is delayed.' };
   }
 }
 
@@ -183,6 +187,10 @@ async function ask(request) {
   const body = await request.clone().json().catch(() => null);
   const question = typeof body?.question === 'string' ? body.question.trim() : '';
   if (!question || question.length > MAX_QUESTION_CHARS) throw new HttpError(400, 'bad_question', `Ask a question of up to ${MAX_QUESTION_CHARS} characters.`);
+  // A question from the menu is answered from the approved facts. One of the
+  // asker's own also draws on Charlie's website, and costs more.
+  const listed = isListed((await facts.get()).facts, question);
+  const price = listed ? LISTED : OWN;
   return paid(request, 'One question for agent.charliethompson.eth', async ({ payer, currency }) => {
     const own = tierOf(payer); // sets the daily allowance
     const tier = capTier(own, body?.as); // sets what the answer may draw on
@@ -190,15 +198,16 @@ async function ask(request) {
     const who = payer ?? 'unknown';
     const used = store.data.questions[who]?.day === day ? store.data.questions[who].count : 0;
     if (used >= DAILY_QUESTIONS[own]) {
-      return signed({ answer: "That's all the questions for today.", refused: true, tier, refund: await refund(payer, currency), at: Date.now() });
+      return signed({ answer: "That's all the questions for today.", refused: true, tier, refund: await refund(payer, currency, price), at: Date.now() });
     }
     store.update((data) => { data.questions[who] = { day, count: used + 1 }; });
-    const { facts: all } = await facts.get();
-    const result = await answerQuestion({ question, facts: factsFor(all, tier), model });
-    const refunded = result.refused ? await refund(payer, currency) : null;
+    const { facts: approved } = await facts.get();
+    const pages = listed ? [] : (await site.get()).facts;
+    const result = await answerQuestion({ question, facts: factsFor([...approved, ...pages], tier), model });
+    const refunded = result.refused ? await refund(payer, currency, price) : null;
     console.log(`ask: tier=${tier} refused=${result.refused}${result.reason ? ` reason=${result.reason}` : ''}`);
-    return signed({ question_sha256: sha256(question), answer: result.answer, refused: result.refused, tier, refund: refunded, ai_receipt: result.receipt ?? null, at: Date.now() });
-  });
+    return signed({ question_sha256: sha256(question), answer: result.answer, refused: result.refused, tier, price: price.amount, refund: refunded, ai_receipt: result.receipt ?? null, at: Date.now() });
+  }, price);
 }
 
 async function location(request) {
@@ -364,6 +373,14 @@ async function savePasskey(request) {
   return json(200, { ok: true });
 }
 
+// ---- Charlie's website as one Markdown file, for agents ----
+
+async function siteMarkdown() {
+  const { markdown } = await site.get();
+  if (!markdown) throw new HttpError(503, 'not_ready', "Charlie's site isn't loaded yet; try again in a minute.");
+  return new Response(markdown, { headers: { 'content-type': 'text/markdown; charset=utf-8', 'cache-control': 'max-age=300' } });
+}
+
 // ---- The question menu: labels only, and only up to the asker's tier ----
 
 async function questions(forAddress) {
@@ -391,6 +408,8 @@ function health() {
     ready: Boolean(payments),
     tokens: { toy: toyToken, toy_symbol: TOY.symbol, pathusd: PATHUSD },
     price: PRICE,
+    prices: { listed: PRICE, own: OWN_PRICE },
+    site: site.status(),
     free_questions: 10,
     model: model.name,
     facts: facts.status(),
@@ -419,6 +438,7 @@ async function route(request) {
   if (method === 'GET' && pathname === '/health') return health();
   if (method === 'GET' && pathname === '/attestation') return attestation();
   if (method === 'GET' && pathname === '/questions') return questions(searchParams.get('for'));
+  if (method === 'GET' && pathname === '/site.md') return siteMarkdown();
   if (method === 'GET' && pathname === '/skill.md') return new Response(skill.replaceAll('{{API}}', PUBLIC_URL), { headers: { 'content-type': 'text/markdown; charset=utf-8' } });
   if (method === 'POST' && pathname === '/ask') return ask(request);
   if (method === 'POST' && pathname === '/location') return location(request);
@@ -470,4 +490,5 @@ server.listen(PORT, HOST, () => console.log(`ask-ens-agent on ${PUBLIC_URL} (lis
 // A crash mid-check would leave a session stuck; let Reclaim's retry through.
 store.update((data) => { for (const entry of Object.values(data.sessions)) if (entry.status === 'checking') entry.status = 'pending'; });
 facts.refresh();
+site.refresh();
 setup();

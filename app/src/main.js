@@ -17,7 +17,9 @@ import { device, extensionInstalled, INSTALL_URL, openApp, prepare as prepareZkp
 const API = String(window.ASK_CONFIG?.api ?? '').replace(/\/+$/, '');
 const EXPLORER = tempoModerato.blockExplorers.default.url; // the testnet explorer
 const PATHUSD = '0x20c0000000000000000000000000000000000000';
-const PRICE = 100_000n; // 0.10
+const PRICE = 100_000n; // 0.10, a question from the menu
+const OWN_PRICE = 250_000n; // 0.25, a question of your own (it can draw on Charlie's whole website)
+const DEFAULT_QUESTION = "What is Charlie's most contrarian position?"; // asked when the box is left empty
 const RP_ID = location.hostname;
 const LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
 // Passkeys belong to the page's host, so only hosts that are this app's alone
@@ -106,10 +108,12 @@ function buildPayments() {
   state.mppx = Mppx.create({
     methods: [tempo.charge({ account: state.account, expectedChainId: tempoModerato.id, allowedChainIds: [tempoModerato.id], expectedRecipients: [health.agent], getClient: () => rpc })],
     polyfill: false,
-    // Sign only what the page promises: 0.10 in pathUSD or TOY.
+    // Sign only what the page promises: one of its two prices, no more than
+    // the question's, in pathUSD or TOY.
     onChallenge: async (challenge, { createCredential }) => {
       const request = challenge.request ?? {};
-      if (String(request.amount) !== PRICE.toString() || !accepted.includes(String(request.currency).toLowerCase())) {
+      const amount = /^\d{1,12}$/.test(String(request.amount)) ? BigInt(request.amount) : -1n;
+      if (![PRICE, OWN_PRICE].includes(amount) || amount > expectedUnits || !accepted.includes(String(request.currency).toLowerCase())) {
         throw new Error('The agent asked for an unexpected price, so nothing was paid.');
       }
       return createCredential();
@@ -263,13 +267,16 @@ async function refresh() {
 
 // ---- Paying for an answer ----
 
-async function paid(path, body) {
-  if (!state.mppx || (state.toy < PRICE && state.usd < PRICE)) await refresh();
+let expectedUnits = PRICE; // what the current payment may cost at most (one at a time)
+
+async function paid(path, body, units = PRICE) {
+  if (!state.mppx || (state.toy < units && state.usd < units)) await refresh();
   if (!state.mppx) throw new Error("Can't reach the agent right now. Try again in a minute.");
-  const pay = state.toy >= PRICE ? 'toy' : 'usd';
-  if (pay === 'usd' && state.usd < PRICE) {
-    throw new Error(state.tier === 'attendee' ? 'You are out of questions for now.' : 'Your balance is used up. Get $1.00 more below.');
+  const pay = state.toy >= units ? 'toy' : 'usd';
+  if (pay === 'usd' && state.usd < units) {
+    throw new Error(`This question costs ${money(units)}, more than your balance. Get $1.00 more from your account.`);
   }
+  expectedUnits = units;
   const res = await state.mppx.fetch(`${API}${path}?pay=${pay}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -288,9 +295,9 @@ function busy(on, text) {
   say(text ?? '');
 }
 
-function receiptLine(data, tx) {
+function receiptLine(data, tx, units) {
   const parts = [];
-  if (isHash(tx)) parts.push(txLink(tx, 'Paid $0.10'));
+  if (isHash(tx)) parts.push(txLink(tx, `Paid ${money(units)}`));
   if (isHash(data.refund?.tx)) parts.push(txLink(data.refund.tx, 'refunded'));
   else if (data.refund) parts.push('refund delayed');
   if (data.signature && isAddress(data.signer)) parts.push(`signed by the agent (${short(data.signer)})`);
@@ -302,18 +309,19 @@ const statusAt = (place) => place($('status'));
 
 // Asks one question and shows the answer inside the card it came from. The
 // public card asks for the public answer even when the asker could hear more.
-async function ask(question, where) {
-  if (!state.account) return openLogin(() => ask(question, where));
+async function ask(question, where, units = PRICE) {
+  if (!state.account) return openLogin(() => ask(question, where, units));
   const address = state.account.address;
   statusAt((el) => $(where).before(el));
-  busy(true, 'Paying $0.10 and asking…');
+  busy(true, `Paying ${money(units)} and asking…`);
   try {
-    const { data, tx } = await paid('/ask', where === 'public-answer' ? { question, as: 'public' } : { question });
+    const { data, tx } = await paid('/ask', where === 'public-answer' ? { question, as: 'public' } : { question }, units);
     if (state.account?.address !== address) return busy(false); // signed out meanwhile: the answer isn't shown to the next person
     const el = $(where);
-    el.innerHTML = `<p class="meta">${escape(question)}</p><blockquote class="${data.refused ? 'refused' : ''}">${escape(data.answer)}</blockquote><p class="meta">${receiptLine(data, tx)}</p>`;
+    const charged = data.price === '0.25' ? OWN_PRICE : PRICE;
+    el.innerHTML = `<p class="meta">${escape(question)}</p><blockquote class="${data.refused ? 'refused' : ''}">${escape(data.answer)}</blockquote><p class="meta">${receiptLine(data, tx, charged)}</p>`;
     el.hidden = false;
-    remember({ kind: 'ask', question, answer: String(data.answer ?? ''), refused: Boolean(data.refused), tx, refunded: Boolean(data.refund), refund: data.refund?.tx ?? null }, address);
+    remember({ kind: 'ask', question, answer: String(data.answer ?? ''), refused: Boolean(data.refused), tx, price: charged.toString(), refunded: Boolean(data.refund), refund: data.refund?.tx ?? null }, address);
     busy(false);
   } catch (error) {
     busy(false);
@@ -322,11 +330,12 @@ async function ask(question, where) {
   refresh();
 }
 
+// Your own question costs more, unless it's one from the menu; left empty, the box asks its placeholder.
 $('ask-form').addEventListener('submit', (event) => {
   event.preventDefault();
-  const question = $('question').value.trim();
-  if (!question) return say('Type a question first.', true);
-  ask(question, 'public-answer');
+  const question = $('question').value.trim() || DEFAULT_QUESTION;
+  const listed = [...state.menu.public, ...state.menu.attendee].some((q) => q.toLowerCase() === question.toLowerCase());
+  ask(question, 'public-answer', listed ? PRICE : OWN_PRICE);
 });
 
 // ---- Free questions (forwarded from the Tempo faucet) ----
@@ -515,7 +524,7 @@ function historyItem(entry) {
   const li = document.createElement('li');
   const when = escape(new Date(entry.at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }));
   const what = entry.kind === 'ask' ? escape(entry.question ?? '') : entry.kind === 'grant' ? 'Frontiers: ten questions on the house' : 'Free test dollars';
-  const amount = entry.kind === 'ask' ? (entry.refunded ? 'refunded' : '−$0.10') : '+$1.00';
+  const amount = entry.kind === 'ask' ? (entry.refunded ? 'refunded' : `−${money(/^\d+$/.test(entry.price ?? '') ? BigInt(entry.price) : PRICE)}`) : '+$1.00';
   const links = [txLink(entry.tx, 'Payment'), txLink(entry.refund, 'refund')].filter(Boolean).join(' · ');
   const row = (tag) => `<${tag} class="row"><span class="what">${what}</span><span class="amount">${amount}</span><span class="when">${when}</span></${tag}>`;
   li.innerHTML = entry.kind === 'ask' && typeof entry.answer === 'string'
@@ -591,7 +600,7 @@ function render() {
 }
 
 // What to paste into an agent; skill.md tells it how to get an account, free test dollars and pay.
-$('agent-prompt').textContent = `Read ${API}/skill.md, then ask agent.charliethompson.eth what books Charlie has read in the last two years.`;
+$('agent-prompt').textContent = `Read ${API}/skill.md, then answer: what overlap exists between my work and interests and those of charliethompson?`;
 $('copy-prompt').addEventListener('click', () => copy($('agent-prompt').textContent, $('copy-prompt')));
 
 async function start() {
