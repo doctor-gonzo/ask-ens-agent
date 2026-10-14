@@ -62,6 +62,8 @@ function say(text, bad = false) {
 }
 const short = (address) => `${address.slice(0, 6)}…${address.slice(-4)}`;
 const money = (units) => `$${Number(formatUnits(units, 6)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+// The header's short form: $0.75, $12.50, $1.2K, $1M.
+const moneyShort = (units) => { const n = Number(formatUnits(units, 6)); return n < 1000 ? money(units) : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 1 }).format(n); };
 const isHash = (value) => typeof value === 'string' && /^0x[0-9a-fA-F]{64}$/.test(value);
 const isAddress = (value) => typeof value === 'string' && /^0x[0-9a-fA-F]{40}$/.test(value);
 const escape = (text) => String(text).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -611,7 +613,8 @@ function render() {
   // Top right, once signed in: what you can spend (all of it test dollars to the visitor).
   const balance = $('balance');
   balance.hidden = !state.account;
-  balance.textContent = !state.account ? '' : state.funding ? 'Adding test dollars…' : money(state.toy + state.usd);
+  balance.textContent = !state.account ? '' : state.funding ? 'Adding…' : moneyShort(state.toy + state.usd);
+  $('account').classList.toggle('signed-in', Boolean(state.account));
   renderWallet();
 }
 
