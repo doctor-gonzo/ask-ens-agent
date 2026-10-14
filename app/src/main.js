@@ -573,6 +573,10 @@ function render() {
   renderWallet();
 }
 
+// What to paste into an agent; skill.md tells it how to get an account, free test dollars and pay.
+$('agent-prompt').textContent = `Read ${API}/skill.md, then ask agent.charliethompson.eth what books Charlie has read in the last two years.`;
+$('copy-prompt').addEventListener('click', () => copy($('agent-prompt').textContent, $('copy-prompt')));
+
 async function start() {
   for (const [id, path] of [['skill', '/skill.md'], ['attest', '/attestation']]) $(id).href = `${API}${path}`;
   render();

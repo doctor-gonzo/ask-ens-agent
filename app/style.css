@@ -122,6 +122,14 @@ button:disabled { opacity: 0.55; cursor: progress; }
 .how li { margin: 0 0 14px; padding-left: 4px; }
 .how strong { font-weight: 600; }
 
+/* Asking from an agent. */
+.agents { margin: 44px 0 0; padding-top: 24px; border-top: 1px solid var(--line); }
+.agents h2 { margin: 0 0 8px; font: 800 24px/1.2 var(--serif); }
+.agents p { margin: 0 0 12px; }
+.prompt { display: flex; gap: 10px; align-items: stretch; }
+.prompt code { flex: 1 1 auto; min-width: 0; padding: 12px 14px; font: 400 14px/1.5 var(--mono); background: #fffef8; border: 1px solid var(--line); border-radius: 3px; overflow-wrap: anywhere; }
+.prompt .secondary { flex: 0 0 auto; min-height: 0; font-size: 16px; }
+
 footer { margin-top: 32px; padding-top: 18px; border-top: 1px solid var(--faint); color: var(--soft); font-size: 15px; }
 footer p { margin: 0 0 8px; }
 
