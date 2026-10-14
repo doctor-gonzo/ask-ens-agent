@@ -117,8 +117,12 @@ button:disabled { opacity: 0.55; cursor: progress; }
 .balances { margin: 0; font: 400 15px/1.5 var(--mono); }
 .wallet .secondary { min-height: 44px; font-size: 16px; }
 
-.how { margin: 44px 0 0; padding: 24px 0 0 1.2em; border-top: 1px solid var(--line); }
-.how li { margin: 0 0 14px; padding-left: 4px; }
+/* The building blocks, each beside its logo. */
+.how { list-style: none; margin: 44px 0 0; padding: 24px 0 0; border-top: 1px solid var(--line); }
+.how li { display: grid; grid-template-columns: 32px 1fr; gap: 16px; align-items: start; margin: 0 0 18px; }
+.how .logo { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; }
+.how .logo img { width: 28px; height: 28px; object-fit: contain; }
+.how p { margin: 0; }
 .how strong { font-weight: 600; }
 
 /* Asking from an agent. */
