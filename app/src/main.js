@@ -566,10 +566,10 @@ function render() {
     : prepared ? `Continue with ${by}` : `Unlock with ${by}`;
   unlock.disabled = state.busy || state.preparing || !credential.live || !state.health?.verification;
 
-  // Top right: what you can spend (all of it test dollars to the visitor), or what you start with.
+  // Top right, once signed in: what you can spend (all of it test dollars to the visitor).
   const balance = $('balance');
-  balance.textContent = state.account ? money(state.toy + state.usd) : '$1.00 to start';
-  balance.title = state.account ? 'Test dollars on Tempo testnet' : 'Sign in and get $1.00 of test dollars: ten questions';
+  balance.hidden = !state.account;
+  balance.textContent = state.account ? money(state.toy + state.usd) : '';
   $('wallet').hidden = !state.account || state.toy >= PRICE || state.usd >= PRICE;
   renderWallet();
 }

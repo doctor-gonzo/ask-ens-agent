@@ -48,7 +48,7 @@ a { color: inherit; text-underline-offset: 3px; }
 /* One line, sized to the column (the column is at most 640px wide). */
 h1 { margin: 40px 0 20px; font: 800 min(84px, calc((100vw - 48px) / 7)) / 1.04 var(--serif); letter-spacing: -0.02em; white-space: nowrap; }
 h1 span { display: inline-block; background: var(--ink); color: var(--bg); padding: 0 0.12em 0.06em; }
-.lead { margin: 0 0 32px; font-size: 20px; line-height: 1.45; max-width: 34ch; }
+.lead { margin: 0 0 32px; font-size: 20px; line-height: 1.45; }
 
 /* Question cards: what each credential lets you ask. */
 .card { margin: 0 0 16px; padding: 18px 18px 16px; border: 1px solid var(--line); border-radius: 4px; background: #fffef8; }
