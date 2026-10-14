@@ -507,7 +507,7 @@ function questionButton(question, { locked, where }) {
   button.type = 'button';
   button.className = 'q';
   button.disabled = locked || state.busy;
-  button.innerHTML = `<span>${escape(question)}</span><span class="go">${locked ? 'locked' : 'ask · $0.10'}</span>`;
+  button.innerHTML = `<span>${escape(question)}</span>${locked ? '<span class="go">locked</span>' : '<span class="go ask">Ask · $0.10</span>'}`;
   if (!locked) button.addEventListener('click', () => ask(question, where));
   li.append(button);
   return li;
