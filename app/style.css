@@ -128,7 +128,7 @@ button:disabled { opacity: 0.55; cursor: progress; }
 .how strong { font-weight: 600; }
 
 /* Asking from an agent. */
-.agents { margin: 44px 0 0; padding-top: 24px; border-top: 1px solid var(--line); }
+.agents { margin: 0 0 20px; }
 .agent-row { display: flex; align-items: center; gap: 12px; }
 /* One button in two parts: copy the prompt, or open it to read first. */
 .split { display: inline-flex; border: 1px solid var(--line); border-radius: 3px; }
@@ -141,7 +141,7 @@ button:disabled { opacity: 0.55; cursor: progress; }
 .split-main.copied .done { display: inline; }
 /* The explainer, on hover or focus. */
 .tip { position: relative; display: inline-flex; flex: none; align-items: center; justify-content: center; width: 24px; height: 24px; border: 1px solid var(--soft); border-radius: 50%; color: var(--soft); font: 600 14px/1 var(--sans); cursor: help; }
-.tip .tip-text { position: absolute; right: -8px; bottom: calc(100% + 10px); width: min(320px, calc(100vw - 48px)); padding: 10px 12px; border-radius: 3px; background: var(--ink); color: var(--bg); font: 400 14px/1.45 var(--sans); opacity: 0; pointer-events: none; transition: opacity 120ms ease; z-index: 5; }
+.tip .tip-text { position: absolute; right: -8px; top: calc(100% + 10px); width: min(320px, calc(100vw - 48px)); padding: 10px 12px; border-radius: 3px; background: var(--ink); color: var(--bg); font: 400 14px/1.45 var(--sans); opacity: 0; pointer-events: none; transition: opacity 120ms ease; z-index: 5; }
 .tip:hover .tip-text, .tip:focus .tip-text { opacity: 1; }
 .agents .prompt { display: block; margin-top: 12px; padding: 12px 14px; font: 400 14px/1.5 var(--mono); background: #fffef8; border: 1px solid var(--line); border-radius: 3px; overflow-wrap: anywhere; }
 
