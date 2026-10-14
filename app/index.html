@@ -67,10 +67,15 @@
   </section>
 
 
-  <section class="agents" aria-labelledby="agents-title">
-    <h2 id="agents-title">Ask from your agent</h2>
-    <p>Paste this into Claude Code or any agent that can run commands. It reads Charlie's site as one Markdown file, compares it with what it knows about you on your side, and can make its own Tempo account to pay for questions.</p>
-    <div class="prompt"><code id="agent-prompt"></code><button id="copy-prompt" class="secondary" type="button">Copy</button></div>
+  <section class="agents" aria-label="Ask from your agent">
+    <div class="agent-row">
+      <div class="split">
+        <button id="copy-prompt" class="split-main" type="button" title="Copy a prompt for your agent"><svg class="clip" aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="3" width="8" height="4" rx="1"/><path d="M16 5h2a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h2"/></svg><svg class="done" aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"/></svg><span>Ask from your agent</span></button>
+        <button id="show-prompt" class="split-caret" type="button" aria-expanded="false" aria-controls="agent-prompt" aria-label="Show the prompt" title="Show the prompt"><svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+      </div>
+      <span class="tip" tabindex="0" role="note" aria-label="Paste this into Claude Code or any agent that can run commands. It reads Charlie's site as one Markdown file, compares it with what it knows about you on your side, and can make its own Tempo account to pay for questions."><span aria-hidden="true">?</span><span class="tip-text" aria-hidden="true">Paste this into Claude Code or any agent that can run commands. It reads Charlie's site as one Markdown file, compares it with what it knows about you on your side, and can make its own Tempo account to pay for questions.</span></span>
+    </div>
+    <code id="agent-prompt" class="prompt" hidden></code>
   </section>
 
   <ul class="how">

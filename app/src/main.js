@@ -603,6 +603,12 @@ function render() {
 // What to paste into an agent; skill.md tells it how to get an account, free test dollars and pay.
 $('agent-prompt').textContent = `Read ${API}/skill.md, then answer: what overlap exists between my work and interests and those of charliethompson?`;
 $('copy-prompt').addEventListener('click', () => copy($('agent-prompt').textContent, $('copy-prompt')));
+$('show-prompt').addEventListener('click', () => {
+  const opening = $('agent-prompt').hidden;
+  $('agent-prompt').hidden = !opening;
+  $('show-prompt').setAttribute('aria-expanded', String(opening));
+  $('show-prompt').setAttribute('aria-label', opening ? 'Hide the prompt' : 'Show the prompt');
+});
 
 async function start() {
   for (const [id, path] of [['skill', '/skill.md'], ['attest', '/attestation']]) $(id).href = `${API}${path}`;
