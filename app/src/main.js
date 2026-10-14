@@ -206,12 +206,14 @@ function remember(entry) {
   if (state.account) local.set(historyKey(), [{ at: Date.now(), ...entry }, ...(local.get(historyKey()) ?? [])].slice(0, 50));
 }
 
+// Copies, then shows it worked for a moment: an icon button turns into a check.
 async function copy(text, button) {
   try {
     await navigator.clipboard.writeText(text);
-    const label = button.textContent;
-    button.textContent = 'Copied';
-    setTimeout(() => { button.textContent = label; }, 1500);
+    const label = button.querySelector('svg') ? null : button.textContent;
+    button.classList.add('copied');
+    if (label) button.textContent = 'Copied';
+    setTimeout(() => { button.classList.remove('copied'); if (label) button.textContent = label; }, 1500);
   } catch {}
 }
 
@@ -517,7 +519,6 @@ function renderWallet() {
   $('wallet-address').href = page;
   $('wallet-explorer').href = page;
   $('wallet-total').textContent = money(state.toy + state.usd);
-  $('wallet-left').textContent = String((state.toy + state.usd) / PRICE);
   $('top-up').disabled = state.busy;
   const items = (local.get(historyKey()) ?? []).slice(0, 20).map(historyItem);
   if (!items.length) {

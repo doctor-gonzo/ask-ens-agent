@@ -143,8 +143,11 @@ dialog::backdrop { background: rgba(18, 18, 17, 0.45); }
 .sheet h3 { margin: 8px 0 0; font: 600 15px/1.3 var(--sans); }
 .sheet .note { margin: 0; }
 .addr { margin: 0; font: 400 14px/1.5 var(--mono); overflow-wrap: anywhere; }
-.addr .link { padding: 0 0 0 6px; font: 400 14px/1.5 var(--sans); }
-.balances { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0; }
+.icon { display: inline-flex; align-items: center; justify-content: center; min-width: 32px; min-height: 32px; margin-left: 2px; padding: 0; vertical-align: middle; background: none; border: 0; color: var(--soft); cursor: pointer; }
+.icon:hover { color: var(--ink); }
+.icon .done, .icon.copied .clip { display: none; }
+.icon.copied .done { display: inline; }
+.balances { margin: 0; }
 .balances div { padding: 10px 12px; border: 1px solid var(--faint); border-radius: 3px; background: #fffef8; }
 .balances dt { color: var(--soft); font-size: 14px; }
 .balances dd { margin: 2px 0 0; font: 400 20px/1.2 var(--mono); }
