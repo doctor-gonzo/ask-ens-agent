@@ -18,6 +18,10 @@ services:
       # Empty until the Frontiers provider exists; verification stays off meanwhile.
       RECLAIM_PROVIDER_ID: ""
       RECLAIM_PROVIDER_VERSION: ""
+      # zkPass proves Frontiers registration meanwhile. Both ids are public, and
+      # the schema id here is the only proof this TEE accepts (docs/zkpass-schema.json).
+      ZKPASS_APP_ID: "69068e60-08b4-42be-a15d-5f2a9220c682"
+      ZKPASS_SCHEMA_ID: "8249f91782964a7fa460c467577edcf8"
     ports:
       - "8790:8790"
     volumes:

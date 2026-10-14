@@ -1,0 +1,22 @@
+{
+  "issuer": "Paradigm",
+  "desc": "Proves the account holder is a confirmed attendee of Paradigm Frontiers 2026.",
+  "website": "https://www.paradigm.xyz/frontiers-2026",
+  "APIs": [
+    {
+      "host": "www.paradigm.xyz",
+      "intercept": {
+        "url": "api/frontiers-2026/status",
+        "method": "GET"
+      },
+      "assert": [
+        { "key": "status", "value": "confirmed", "operation": "=" }
+      ],
+      "nullifier": "email"
+    }
+  ],
+  "HRCondition": ["Confirmed Paradigm Frontiers 2026 attendee"],
+  "tips": {
+    "message": "Sign in if asked. The proof starts once the page knows it's you."
+  }
+}

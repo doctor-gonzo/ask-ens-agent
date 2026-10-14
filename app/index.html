@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: https:; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; frame-src https:; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: https:; connect-src 'self' https: http://localhost:* http://127.0.0.1:* chrome-extension://afkoofjocpbclhnldmmaphappihehpma; frame-src https:; base-uri 'none'; form-action 'none'; object-src 'none'">
 <title>Ask agent.charliethompson.eth</title>
 <meta name="description" content="Charlie's personal agent answers from facts he approved. It runs in a TEE and charges a dime on Tempo.">
 <meta name="theme-color" content="#f5f4ee">
@@ -58,7 +58,7 @@
     </div>
     <ul id="locked-questions" class="questions"></ul>
     <p id="credential-note" class="note"></p>
-    <button id="unlock" class="secondary" type="button">Unlock with Reclaim</button>
+    <button id="unlock" class="secondary" type="button">Unlock</button>
     <div id="locked-answer" class="answer" hidden aria-live="polite"></div>
   </section>
 
@@ -72,7 +72,7 @@
     <li><strong>A name.</strong> agent.charliethompson.eth points to this page and to the agent, so any agent can find it.</li>
     <li><strong>Pay per question.</strong> Your passkey is a Tempo account. Each answer costs $0.10 in test dollars, paid with MPP; the agent covers gas and refunds refusals. You start with $1.00.</li>
     <li><strong>Private by design.</strong> The agent runs in a TEE and sees only the facts your credentials unlock. A second check reads every answer before it leaves.</li>
-    <li><strong>Credentials unlock questions.</strong> Today: a Reclaim zkTLS proof of Paradigm Frontiers registration. Next: soulbound tokens that carry such proofs.</li>
+    <li><strong>Credentials unlock questions.</strong> Today: a zkPass zkTLS proof of Paradigm Frontiers registration, checked inside the TEE. Next: soulbound tokens that carry such proofs.</li>
   </ol>
 </main>
 

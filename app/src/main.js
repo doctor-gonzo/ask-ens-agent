@@ -3,7 +3,8 @@
 // the gas. Static files only, so it can live on IPFS behind the ENS name.
 //
 // Two cards: questions anyone can ask, and questions a credential unlocks
-// (today a Reclaim proof of Paradigm Frontiers registration).
+// (today a zkPass proof of Paradigm Frontiers registration; Reclaim when its
+// provider exists).
 import { Receipt } from 'mppx';
 import { Mppx, tempo } from 'mppx/client';
 import { WebAuthnP256 as Passkey, PublicKey } from 'ox';
@@ -11,6 +12,7 @@ import { bytesToHex, createClient, formatUnits, http, publicActions } from 'viem
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import { tempoModerato } from 'viem/chains';
 import { Abis, Account, WebAuthnP256 } from 'viem/tempo';
+import { device, extensionInstalled, INSTALL_URL, openApp, prepare as prepareZkpass, runExtension, waitForRelay } from './zkpass.js';
 
 const API = String(window.ASK_CONFIG?.api ?? '').replace(/\/+$/, '');
 const EXPLORER = tempoModerato.blockExplorers.default.url; // the testnet explorer
@@ -25,8 +27,8 @@ const OWN_HOST = LOCAL || /^agent\.charliethompson\.eth\.(link|limo)$/.test(loca
 // What each credential would unlock. Only the Frontiers proof is live; the
 // others show where this goes next.
 const CREDENTIALS = {
-  frontiers: { live: true, unlock: 'Unlock with Reclaim', note: 'Prove your Paradigm Frontiers 2026 registration with a Reclaim zkTLS proof. You also get ten questions on the house.' },
-  friends: { live: false, questions: ['What are you working on?', 'Want to grab a coffee?'], unlock: 'Coming soon', note: 'A soulbound token from Charlie, which can carry a Reclaim proof, so closeness travels with you.' },
+  frontiers: { live: true }, // its button and note name whichever proof the agent takes
+  friends: { live: false, questions: ['What are you working on?', 'Want to grab a coffee?'], unlock: 'Coming soon', note: 'A soulbound token from Charlie, which can carry a zkTLS proof, so closeness travels with you.' },
   colleagues: { live: false, questions: ["What's on your calendar this week?"], unlock: 'Coming soon', note: 'A proof that you have a work email at the same company, without revealing the address.' },
 };
 
@@ -62,7 +64,7 @@ const escape = (text) => String(text).replace(/[&<>"']/g, (c) => ({ '&': '&amp;'
 const txLink = (hash, text) => (isHash(hash) ? `<a href="${EXPLORER}/tx/${hash}" target="_blank" rel="noopener noreferrer">${text}</a>` : '');
 const cancelled = (error) => [error, error?.cause, error?.cause?.cause].some((e) => e?.name === 'NotAllowedError' || e?.name === 'AbortError');
 
-// A prepared Reclaim request (first click) and the current status poller.
+// A prepared proof request (first click) and the current status poller.
 let prepared = null;
 let pollId = 0;
 
@@ -295,14 +297,17 @@ async function faucet(quiet = false) {
 }
 $('faucet').addEventListener('click', () => faucet());
 
-// ---- Unlocking with a credential (Reclaim, for Frontiers) ----
-// Two clicks: the first prepares the proof request; the second opens Reclaim
-// straight from the click, so browsers don't block it as a popup.
+// ---- Unlocking with a credential (Frontiers: zkPass, or Reclaim) ----
+
+const provider = () => (state.health?.zkpass ? 'zkPass' : 'Reclaim');
 
 $('unlock').addEventListener('click', async () => {
   if ($('credential').value !== 'frontiers' || state.preparing) return;
   if (!state.account) return openLogin(() => $('unlock').click());
   statusAt((el) => $('unlock').after(el));
+  if (state.health?.zkpass) return unlockWithZkpass();
+  // Reclaim takes two clicks: the first prepares the proof request; the second
+  // opens Reclaim straight from the click, so browsers don't block it as a popup.
   if (prepared) {
     const { request, session, url } = prepared;
     prepared = null;
@@ -331,6 +336,51 @@ $('unlock').addEventListener('click', async () => {
     render();
   }
 });
+
+// zkPass: on a computer the TransGate extension runs the proof in one go. On a
+// phone the first tap prepares a task and the second opens zkPass's app
+// straight from the tap; the page then waits for zkPass's relay.
+async function unlockWithZkpass() {
+  const address = state.account.address;
+  const ready = prepared?.kind === 'zkpass' ? prepared : null;
+  prepared = null;
+  state.preparing = true;
+  render();
+  try {
+    let result;
+    if (ready) {
+      openApp(ready);
+      say('Sign in to your Frontiers account in zkPass, then come back here.');
+      result = await waitForRelay(ready, { cancelled: () => state.account?.address !== address });
+    } else {
+      const onPhone = device() !== 'computer';
+      if (!onPhone && !(await extensionInstalled())) {
+        $('status').innerHTML = `Add <a href="${INSTALL_URL}" target="_blank" rel="noopener noreferrer">zkPass TransGate</a> to Chrome, then tap Unlock again.`;
+        return;
+      }
+      say('Preparing your zkPass proof…');
+      const task = await prepareZkpass({ appId: state.health.zkpass.app_id, schemaId: state.health.zkpass.schema_id, address });
+      if (state.account?.address !== address) return;
+      if (onPhone) {
+        prepared = { kind: 'zkpass', ...task };
+        return say('Ready. Continue in zkPass to prove your Frontiers registration.');
+      }
+      say("Sign in to your Frontiers account in the tab zkPass opens. The proof starts once Paradigm knows it's you.");
+      result = await runExtension(task);
+    }
+    if (state.account?.address !== address) return;
+    say('Checking your proof…');
+    const outcome = await post('/verify/zkpass', { address, result });
+    if (outcome.status === 'already_claimed') return say('That Frontiers account was already used.', true);
+    say(outcome.already ? "You're already verified for Frontiers." : outcome.grant_delayed ? 'Verified. Your ten questions are on the way.' : 'Verified: ten questions on the house, and closer answers.');
+    await refresh();
+  } catch (error) {
+    say(error.message, true);
+  } finally {
+    state.preparing = false;
+    render();
+  }
+}
 
 // Polls until the proof lands; a newer poll or a sign-out ends this one.
 // An error is shown but polling goes on, since a retry in Reclaim still counts.
@@ -390,12 +440,16 @@ function render() {
   $('lock-word').textContent = held ? 'Unlocked for' : 'Locked to';
   $('shackle').setAttribute('d', held ? 'M8 11V8a4 4 0 0 1 7.6-1.8' : 'M8 11V8a4 4 0 0 1 8 0v3');
   $('locked-questions').replaceChildren(...questions.map((q) => questionButton(q, { locked: !held, where: 'locked-answer' })));
-  $('credential-note').textContent = held ? '' : credential.note;
+  const by = provider();
+  const note = key === 'frontiers' ? `Prove your Paradigm Frontiers 2026 registration with a ${by} zkTLS proof. You also get ten questions on the house.` : credential.note;
+  $('credential-note').textContent = held ? '' : note;
   const unlock = $('unlock');
   unlock.hidden = held;
-  unlock.textContent = key === 'frontiers' && prepared ? 'Continue with Reclaim' : credential.unlock;
+  unlock.textContent = key !== 'frontiers' ? credential.unlock
+    : !state.health?.verification ? `Unlock with ${by} (opening soon)`
+    : state.preparing && by === 'zkPass' ? 'Waiting for zkPass…'
+    : prepared ? `Continue with ${by}` : `Unlock with ${by}`;
   unlock.disabled = state.busy || state.preparing || !credential.live || !state.health?.verification;
-  if (key === 'frontiers' && !state.health?.verification) unlock.textContent = 'Unlock with Reclaim (opening soon)';
 
   // Top right: what you can spend (toy dollars plus test dollars), or what you start with.
   const balance = $('balance');

@@ -18,6 +18,7 @@ import { loadKeys } from '../lib/keys.mjs';
 import { checkProof, claimKey, reclaimConfig, SESSION_TTL_MS, startProof } from '../lib/reclaim.mjs';
 import { dayOf, openStore } from '../lib/store.mjs';
 import { createTempo } from '../lib/tempo.mjs';
+import { checkZkpass, zkpassConfig } from '../lib/zkpass.mjs';
 
 const env = process.env;
 const PORT = Number(env.PORT ?? 8790);
@@ -34,6 +35,7 @@ const AGENT = tempo.account.address;
 const facts = createFactsSource({ file: env.FACTS_FILE, repo: env.FACTS_REPO, path: env.FACTS_PATH || 'facts.yaml', token: env.FACTS_TOKEN });
 const model = env.MODEL === 'fixture' ? fixtureModel() : confidentialModel({ apiKey: env.CONFIDENTIAL_AI_KEY, ...(env.CONFIDENTIAL_AI_URL ? { baseUrl: env.CONFIDENTIAL_AI_URL } : {}), ...(env.MODEL ? { model: env.MODEL } : {}) });
 const reclaim = reclaimConfig(env);
+const zkpass = zkpassConfig(env);
 const skill = readFileSync(new URL('../skill/SKILL.md', import.meta.url), 'utf8');
 
 class HttpError extends Error {
@@ -231,7 +233,42 @@ async function faucet(request) {
   }
 }
 
-// ---- Frontiers attendance (Reclaim) ----
+// ---- Frontiers attendance ----
+
+// Admits an account once its proof checked out: one claim per Frontiers
+// identity, and the first admission mints the ten free questions.
+async function admit(address, identity) {
+  const key = claimKey(keys.nullifier, identity);
+  if (store.data.claims[key] && store.data.claims[key] !== address) return { status: 'already_claimed' };
+  const already = Boolean(store.data.attendees[address]);
+  store.update((data) => { data.claims[key] = address; data.attendees[address] ??= { verified_at: Date.now() }; });
+  if (already) return { status: 'verified', already: true };
+  let tx = null;
+  try {
+    tx = await tempo.mint(toyToken, address, GRANT_UNITS);
+  } catch (error) {
+    console.error(`Attendee grant failed: ${error.shortMessage ?? error.message}`);
+    store.update((data) => { (data.failedGrants ??= []).push({ address, at: Date.now() }); });
+  }
+  return { status: 'verified', tx, ...(tx ? {} : { grant_delayed: true }) };
+}
+
+// zkPass: the page hands over TransGate's result, and it is checked here.
+async function verifyZkpass(request) {
+  const body = await request.json().catch(() => null);
+  const address = addressOf(body?.address);
+  if (!address) throw new HttpError(400, 'bad_address', 'Send { "address": "0x…", "result": { … } }.');
+  if (!zkpass.ready) throw new HttpError(503, 'not_ready', 'Frontiers verification is not set up yet.');
+  if (!toyToken) throw new HttpError(503, 'starting', 'The agent is still setting up on Tempo; try again in a minute.');
+  if (store.data.attendees[address]) return json(200, { status: 'verified', already: true });
+  limit('verify:all', 30, 60_000);
+  const outcome = await checkZkpass({ result: body?.result, schemaId: zkpass.schemaId, address })
+    .catch(() => ({ ok: false, error: 'The proof could not be checked.' }));
+  if (!outcome.ok) throw new HttpError(400, 'not_verified', outcome.error);
+  return json(200, await admit(address, outcome.identity));
+}
+
+// Reclaim: a session per attempt, and Reclaim posts the proof back.
 
 async function verifyStart(request) {
   const address = addressOf((await request.json().catch(() => null))?.address);
@@ -301,19 +338,7 @@ async function proofCallback(request, session) {
     finish({ status: failures >= 3 ? 'failed' : 'pending', failures, error: outcome.error });
     throw new HttpError(400, 'not_verified', outcome.error);
   }
-  const key = claimKey(keys.nullifier, outcome.identity);
-  if (store.data.claims[key] && store.data.claims[key] !== pending.address) { finish({ status: 'already_claimed', error: undefined }); return json(200, { ok: true }); }
-  const already = Boolean(store.data.attendees[pending.address]);
-  store.update((data) => { data.claims[key] = pending.address; data.attendees[pending.address] ??= { verified_at: Date.now() }; });
-  if (already) { finish({ status: 'verified', error: undefined, already: true }); return json(200, { ok: true }); }
-  let tx = null;
-  try {
-    tx = await tempo.mint(toyToken, pending.address, GRANT_UNITS);
-  } catch (error) {
-    console.error(`Attendee grant failed: ${error.shortMessage ?? error.message}`);
-    store.update((data) => { (data.failedGrants ??= []).push({ address: pending.address, at: Date.now() }); });
-  }
-  finish({ status: 'verified', error: undefined, tx, ...(tx ? {} : { grant_delayed: true }) });
+  finish({ ...(await admit(pending.address, outcome.identity)), error: undefined });
   return json(200, { ok: true });
 }
 
@@ -356,7 +381,9 @@ function health() {
     free_questions: 10,
     model: model.name,
     facts: facts.status(),
-    verification: reclaim.ready,
+    verification: reclaim.ready || zkpass.ready,
+    // zkPass ids are public: the page needs them to start a proof.
+    zkpass: zkpass.ready ? { app_id: zkpass.appId, schema_id: zkpass.schemaId } : null,
   });
 }
 
@@ -384,6 +411,7 @@ async function route(request) {
   if (method === 'POST' && pathname === '/location') return location(request);
   if (method === 'POST' && pathname === '/faucet') return faucet(request);
   if (method === 'POST' && pathname === '/verify') return verifyStart(request);
+  if (method === 'POST' && pathname === '/verify/zkpass') return verifyZkpass(request);
   if (method === 'GET' && pathname.startsWith('/verify/')) return verifyStatus(pathname.slice(8));
   if (method === 'POST' && pathname === '/proofs/callback') return proofCallback(request, searchParams.get('session'));
   if (method === 'GET' && pathname.startsWith('/tier/')) return json(200, { tier: tierOf(addressOf(pathname.slice(6))) });

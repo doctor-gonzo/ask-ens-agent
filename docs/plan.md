@@ -55,6 +55,7 @@ JSON over HTTPS. Paid routes answer `402` with an MPP challenge first.
 | `POST /verify` `{ address }` | Start a Reclaim proof for that address: `{ session, request_url }` |
 | `GET /verify/:session` | `pending`, `verified`, `already_claimed` or `failed` |
 | `POST /proofs/callback?session=` | Reclaim posts the proof; verified here |
+| `POST /verify/zkpass` `{ address, result }` | A TransGate result, checked here (allocator and validator signatures, schema, recipient = address) |
 | `GET /tier/:address` | `public` or `attendee` |
 | `GET /questions` | The question labels each tier unlocks (labels only, never answers) |
 | `POST /ask` `{ question, as? }` | Paid. `{ answer, refused, refund, tier, signature }`; `as: "public"` asks for the public answer |
@@ -86,6 +87,9 @@ location:
   someone makes (per-IP limits would throttle a crowd behind one gateway).
 - The Reclaim proof shows the TEE the account's email or address. The TEE
   keeps only a keyed hash (to allow one claim per account) and discards it.
+  A zkPass proof shows the TEE only zkPass's hash of the email (`uHash`),
+  which is keyed the same way. A wallet sign-in without an email may not be
+  able to make a zkPass proof, since the email is its per-person field.
 - Question text is never stored.
 
 ## Build order
