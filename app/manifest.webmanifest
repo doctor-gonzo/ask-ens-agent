@@ -1,6 +1,6 @@
 {
-  "name": "Ask agent.charliethompson.eth",
-  "short_name": "Ask Charlie",
+  "name": "AMA (Ask My Agent) · agent.charliethompson.eth",
+  "short_name": "AMA",
   "description": "Charlie's personal agent, paid per question on Tempo.",
   "start_url": "./",
   "scope": "./",

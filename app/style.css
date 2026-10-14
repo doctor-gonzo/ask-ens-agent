@@ -46,7 +46,7 @@ a { color: inherit; text-underline-offset: 3px; }
 }
 
 /* One line, sized to the column (the column is at most 640px wide). */
-h1 { margin: 40px 0 28px; font: 800 min(84px, calc((100vw - 48px) / 7)) / 1.04 var(--serif); letter-spacing: -0.02em; white-space: nowrap; }
+h1 { margin: 40px 0 28px; font: 800 min(64px, calc((100vw - 48px) / 10.5)) / 1.04 var(--serif); letter-spacing: -0.02em; white-space: nowrap; }
 h1 span { display: inline-block; background: var(--ink); color: var(--bg); padding: 0 0.12em 0.06em; }
 
 /* Question cards: what each credential lets you ask. */
