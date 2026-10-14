@@ -404,7 +404,8 @@ $('unlock').addEventListener('click', async () => {
     const address = state.account.address;
     const start = await post('/verify', { address });
     if (start.status === 'verified') { say("You're verified for Frontiers."); return refresh(); }
-    const { ReclaimProofRequest } = await import('@reclaimprotocol/js-sdk');
+    const sdk = await import('@reclaimprotocol/js-sdk');
+    const { ReclaimProofRequest } = sdk.ReclaimProofRequest ? sdk : sdk.default; // a CommonJS package, so bundled under default
     const request = await ReclaimProofRequest.fromJsonString(start.request);
     if (state.account?.address !== address) return; // signed out meanwhile
     prepared = { session: start.session, url: start.request_url, request };
