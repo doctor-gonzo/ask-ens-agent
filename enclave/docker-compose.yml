@@ -4,7 +4,7 @@
 # the attested compose file on purpose.
 services:
   agent:
-    image: ghcr.io/doctor-gonzo/ask-ens-agent@sha256:c418c4c861bc8e80599985f5efaf3a0a07facd277716579302a0a31852b51833
+    image: ghcr.io/doctor-gonzo/ask-ens-agent@sha256:82436515abdbdc6576a8044ed9513c1118ea64d8321956dc75ee1fc479a67cc5
     restart: always
     environment:
       PUBLIC_URL: ${PUBLIC_URL}
