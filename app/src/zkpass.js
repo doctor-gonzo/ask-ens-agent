@@ -8,7 +8,6 @@ import { keccak256, stringToHex } from 'viem';
 const SERVER = 'https://dev.zkpass.org/v1';
 const RELAY = `${SERVER}/relay/proof`;
 const EXTENSION_ID = 'afkoofjocpbclhnldmmaphappihehpma';
-export const INSTALL_URL = `https://chromewebstore.google.com/detail/${EXTENSION_ID}`;
 
 export class ZkpassError extends Error {
   constructor(code, message) { super(message); this.code = code; }
@@ -24,6 +23,8 @@ export async function extensionInstalled() {
 
 async function zkpassPost(url, body) {
   const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  // 700 is zkPass's "origin not allowed": proofs start only from the app's registered address.
+  if (res.status === 700) throw new ZkpassError('origin', 'zkPass only runs proofs started from agent.charliethompson.eth.link.');
   if (!res.ok) throw new ZkpassError('unavailable', `zkPass answered ${res.status}. Try again in a minute.`);
   return (await res.json())?.info;
 }
@@ -110,7 +111,10 @@ export async function runExtension({ appId, schemaId, address, task }, { cancell
   });
 }
 
-// ---- On a phone: zkPass's App Clip or app, then its relay ----
+// ---- On a phone (or by QR from a computer): zkPass's App Clip or app, then its relay ----
+
+// What a computer without the extension shows as a QR code, as zkPass's SDK does.
+export const handoffUrl = ({ query }) => `https://app.zkpass.org/verify?${query}`;
 
 // Opens zkPass from a tap (a link click, so the phone lets it through).
 export function openApp({ query }) {

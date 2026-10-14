@@ -17,10 +17,10 @@
 <header class="top">
   <a class="name" href="./">agent.charliethompson.eth</a>
   <div class="top-right">
-  <span id="balance" class="balance" title="Test dollars on Tempo testnet" hidden></span>
   <button id="account" class="account" type="button" aria-haspopup="dialog">
     <svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M7.5 4.6A9 9 0 0 1 21 12v1.5"/><path d="M3 12a9 9 0 0 1 2.1-5.8"/><path d="M6 12a6 6 0 0 1 12 0v1c0 2.6-.6 5-1.7 7"/><path d="M9 12a3 3 0 0 1 6 0v1c0 3-.9 5.7-2.4 8"/><path d="M12 12v1c0 3.4-1.1 6.4-3 8.6"/><path d="M6 15.5c0 1.8-.4 3.4-1.2 4.8"/></svg>
     <span id="account-label">login</span>
+    <span id="balance" class="balance" title="Test dollars on Tempo testnet" hidden></span>
   </button>
   </div>
 </header>
@@ -68,20 +68,21 @@
     </div>
     <ul id="locked-questions" class="questions"></ul>
     <p id="credential-note" class="note"></p>
+    <div id="handoff" class="handoff" hidden>
+      <div id="qr" class="qr" role="img" aria-label="QR code to finish on your phone"></div>
+      <p>Scan with your phone to prove your registration there. This page unlocks by itself. <button id="cancel-handoff" class="link" type="button">Cancel</button></p>
+    </div>
     <button id="unlock" class="secondary" type="button">Unlock</button>
     <div id="locked-answer" class="answer" hidden aria-live="polite"></div>
   </section>
 
   <p id="status" class="status" role="status" aria-live="polite"></p>
 
-  <section id="wallet" class="wallet" hidden>
-    <button id="faucet" class="secondary" type="button">Get free test dollars</button>
-  </section>
 
 
   <ul class="how">
     <li><a class="logo" href="https://ens.domains" target="_blank" rel="noopener noreferrer"><img src="logos/ens.svg" alt="ENS" width="28" height="28"></a><p><strong>A name, on ENS.</strong> agent.charliethompson.eth points to this page and to the agent, so any agent can find it.</p></li>
-    <li><a class="logo" href="https://tempo.xyz" target="_blank" rel="noopener noreferrer"><img src="logos/tempo.svg" alt="Tempo" width="28" height="28"></a><p><strong>Pay per question, on Tempo.</strong> Your passkey is a Tempo account, funded with free test dollars from Tempo's faucet. Answers cost $0.10, or $0.25 for a question of your own (it can draw on Charlie's website or private data sources), paid with MPP; the agent covers gas and refunds refusals.</p></li>
+    <li><a class="logo" href="https://tempo.xyz" target="_blank" rel="noopener noreferrer"><img src="logos/tempo.svg" alt="Tempo" width="28" height="28"></a><p><strong>Pay per question, on Tempo.</strong> Your passkey is a Tempo account, funded with $1.00 in free test dollars a day. Answers cost $0.10, or $0.25 for a question of your own (it can draw on Charlie's website or private data sources), paid with MPP; the agent covers gas and refunds refusals.</p></li>
     <li><a class="logo" href="https://phala.com" target="_blank" rel="noopener noreferrer"><img src="logos/phala.svg" alt="Phala" width="28" height="28"></a><p><strong>Private by design, in a Phala TEE.</strong> The agent sees only the facts your credentials unlock, and a second check reads every answer before it leaves.</p></li>
     <li><a class="logo" href="https://zkpass.org" target="_blank" rel="noopener noreferrer"><img src="logos/zkpass.svg" alt="zkPass" width="28" height="28"></a><p><strong>Credentials unlock questions, with zkPass.</strong> Today: a zkTLS proof of Paradigm Frontiers registration, checked inside the TEE. Also feasible: gating by soulbound tokens or attestations carried in text fields of ENS names.</p></li>
   </ul>
@@ -102,7 +103,7 @@
     <dl class="balances">
       <div><dt>Test dollars</dt><dd id="wallet-total">$0.00</dd></div>
     </dl>
-    <button id="top-up" class="primary choice" type="button">Get free test dollars</button>
+    <button id="top-up" class="primary choice" type="button">Get $1.00 in test dollars</button>
     <h3>Payments on this device</h3>
     <ol id="history" class="history"></ol>
     <p class="note"><a id="wallet-explorer" target="_blank" rel="noopener noreferrer">All of this account's activity on the Tempo explorer</a></p>

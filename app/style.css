@@ -39,6 +39,7 @@ a { color: inherit; text-underline-offset: 3px; }
 .name { font: 400 15px/1.2 var(--mono); text-decoration: none; overflow-wrap: anywhere; }
 .top-right { display: flex; align-items: center; gap: 12px; }
 .balance { font: 400 15px/1 var(--mono); white-space: nowrap; }
+.account .balance { margin-left: 2px; padding-left: 10px; border-left: 1px solid var(--faint); }
 .account {
   display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 16px;
   background: transparent; color: var(--ink); border: 1px solid var(--line); border-radius: 3px;
@@ -91,6 +92,11 @@ h1 span { display: inline-block; background: var(--ink); color: var(--bg); paddi
 .note { margin: 10px 0 12px; color: var(--soft); font-size: 15px; }
 .note:empty { display: none; }
 .locked #unlock { width: 100%; }
+/* The QR handoff: finish the proof on a phone. */
+.handoff { margin: 12px 0; text-align: center; }
+.handoff .qr svg { display: block; width: 200px; height: 200px; margin: 0 auto 8px; }
+.handoff p { margin: 0; color: var(--soft); font-size: 15px; }
+.handoff .link { padding: 0; }
 /* A hidden question: a bar where its words would be. */
 .q.veiled { cursor: default; }
 .q .bar { display: block; flex: 0 1 62%; height: 0.9em; border-radius: 2px; background: var(--faint); }
@@ -115,9 +121,6 @@ button:disabled { opacity: 0.55; cursor: progress; }
 .card .status:empty { display: none; }
 
 
-.wallet { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin: 8px 0 0; }
-.balances { margin: 0; font: 400 15px/1.5 var(--mono); }
-.wallet .secondary { min-height: 44px; font-size: 16px; }
 
 /* The building blocks, each beside its logo. */
 .how { list-style: none; margin: 44px 0 0; padding: 24px 0 0; border-top: 1px solid var(--line); }
