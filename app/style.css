@@ -132,8 +132,10 @@ button:disabled { opacity: 0.55; cursor: progress; }
 .prompt code { flex: 1 1 auto; min-width: 0; padding: 12px 14px; font: 400 14px/1.5 var(--mono); background: #fffef8; border: 1px solid var(--line); border-radius: 3px; overflow-wrap: anywhere; }
 .prompt .secondary { flex: 0 0 auto; min-height: 0; font-size: 16px; }
 
-footer { margin-top: 32px; padding-top: 18px; border-top: 1px solid var(--faint); color: var(--soft); font-size: 15px; }
-footer p { margin: 0 0 8px; }
+footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 32px; padding-top: 18px; border-top: 1px solid var(--faint); color: var(--soft); font-size: 15px; }
+footer p { margin: 0; }
+footer .repo { display: inline-flex; min-width: 44px; min-height: 44px; align-items: center; justify-content: flex-end; color: var(--soft); }
+footer .repo:hover { color: var(--ink); }
 
 dialog { border: 0; padding: 0; background: transparent; max-width: min(440px, calc(100vw - 32px)); width: 100%; }
 dialog::backdrop { background: rgba(18, 18, 17, 0.45); }

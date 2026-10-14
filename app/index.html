@@ -66,22 +66,24 @@
     <button id="faucet" class="secondary" type="button">Get $1.00 of free questions</button>
   </section>
 
-  <ul class="how">
-    <li><a class="logo" href="https://ens.domains" target="_blank" rel="noopener noreferrer"><img src="logos/ens.svg" alt="ENS" width="28" height="28"></a><p><strong>A name, on ENS.</strong> agent.charliethompson.eth points to this page and to the agent, so any agent can find it.</p></li>
-    <li><a class="logo" href="https://tempo.xyz" target="_blank" rel="noopener noreferrer"><img src="logos/tempo.svg" alt="Tempo" width="28" height="28"></a><p><strong>Pay per question, on Tempo.</strong> Your passkey is a Tempo account. Answers cost $0.10, or $0.25 for a question of your own (it can draw on Charlie's website), in test dollars paid with MPP; the agent covers gas and refunds refusals. You start with $1.00.</p></li>
-    <li><a class="logo" href="https://phala.com" target="_blank" rel="noopener noreferrer"><img src="logos/phala.svg" alt="Phala" width="28" height="28"></a><p><strong>Private by design, in a Phala TEE.</strong> The agent sees only the facts your credentials unlock, and a second check reads every answer before it leaves.</p></li>
-    <li><a class="logo" href="https://zkpass.org" target="_blank" rel="noopener noreferrer"><img src="logos/zkpass.svg" alt="zkPass" width="28" height="28"></a><p><strong>Credentials unlock questions, with zkPass.</strong> Today: a zkTLS proof of Paradigm Frontiers registration, checked inside the TEE. Next: soulbound tokens that carry such proofs.</p></li>
-  </ul>
 
   <section class="agents" aria-labelledby="agents-title">
     <h2 id="agents-title">Ask from your agent</h2>
     <p>Paste this into Claude Code or any agent that can run commands. It reads Charlie's site as one Markdown file, compares it with what it knows about you on your side, and can make its own Tempo account to pay for questions.</p>
     <div class="prompt"><code id="agent-prompt"></code><button id="copy-prompt" class="secondary" type="button">Copy</button></div>
   </section>
+
+  <ul class="how">
+    <li><a class="logo" href="https://ens.domains" target="_blank" rel="noopener noreferrer"><img src="logos/ens.svg" alt="ENS" width="28" height="28"></a><p><strong>A name, on ENS.</strong> agent.charliethompson.eth points to this page and to the agent, so any agent can find it.</p></li>
+    <li><a class="logo" href="https://tempo.xyz" target="_blank" rel="noopener noreferrer"><img src="logos/tempo.svg" alt="Tempo" width="28" height="28"></a><p><strong>Pay per question, on Tempo.</strong> Your passkey is a Tempo account. Answers cost $0.10, or $0.25 for a question of your own (it can draw on Charlie's website), in test dollars paid with MPP; the agent covers gas and refunds refusals. You start with $1.00.</p></li>
+    <li><a class="logo" href="https://phala.com" target="_blank" rel="noopener noreferrer"><img src="logos/phala.svg" alt="Phala" width="28" height="28"></a><p><strong>Private by design, in a Phala TEE.</strong> The agent sees only the facts your credentials unlock, and a second check reads every answer before it leaves.</p></li>
+    <li><a class="logo" href="https://zkpass.org" target="_blank" rel="noopener noreferrer"><img src="logos/zkpass.svg" alt="zkPass" width="28" height="28"></a><p><strong>Credentials unlock questions, with zkPass.</strong> Today: a zkTLS proof of Paradigm Frontiers registration, checked inside the TEE. Next: soulbound tokens that carry such proofs.</p></li>
+  </ul>
 </main>
 
 <footer>
   <p><a id="skill" href="#">skill.md</a> for agents · <a id="attest" href="#">attestation</a></p>
+  <a class="repo" href="https://github.com/doctor-gonzo/ask-ens-agent" target="_blank" rel="noopener noreferrer" aria-label="Source code on GitHub" title="Source code on GitHub"><svg aria-hidden="true" viewBox="0 0 16 16" width="22" height="22" fill="currentColor"><path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"/></svg></a>
 </footer>
 
 <dialog id="wallet-sheet" aria-labelledby="wallet-title">
