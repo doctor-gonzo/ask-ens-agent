@@ -64,9 +64,11 @@ const escape = (text) => String(text).replace(/[&<>"']/g, (c) => ({ '&': '&amp;'
 const txLink = (hash, text) => (isHash(hash) ? `<a href="${EXPLORER}/tx/${hash}" target="_blank" rel="noopener noreferrer">${text}</a>` : '');
 const cancelled = (error) => [error, error?.cause, error?.cause?.cause].some((e) => e?.name === 'NotAllowedError' || e?.name === 'AbortError');
 
-// A prepared proof request (first click) and the current status poller.
+// A prepared proof request (first click), the current status poller, and the
+// current zkPass run (a sign-out or a newer run calls off an older one).
 let prepared = null;
 let pollId = 0;
+let unlockRun = 0;
 
 // ---- The agent's health and its question menu ----
 
@@ -110,6 +112,8 @@ function buildPayments() {
 function useAccount(saved) {
   prepared = null;
   pollId++;
+  unlockRun++;
+  state.preparing = false;
   if (saved?.kind === 'test' && !LOCAL) saved = null;
   if (saved?.kind === 'passkey' && !OWN_HOST) saved = null;
   Object.assign(state, { toy: 0n, usd: 0n, tier: 'public', mppx: null });
@@ -248,10 +252,12 @@ const statusAt = (place) => place($('status'));
 // public card asks for the public answer even when the asker could hear more.
 async function ask(question, where) {
   if (!state.account) return openLogin(() => ask(question, where));
+  const address = state.account.address;
   statusAt((el) => $(where).before(el));
   busy(true, 'Paying $0.10 and asking…');
   try {
     const { data, tx } = await paid('/ask', where === 'public-answer' ? { question, as: 'public' } : { question });
+    if (state.account?.address !== address) return busy(false); // signed out meanwhile: the answer isn't shown to the next person
     const el = $(where);
     el.innerHTML = `<p class="meta">${escape(question)}</p><blockquote class="${data.refused ? 'refused' : ''}">${escape(data.answer)}</blockquote><p class="meta">${receiptLine(data, tx)}</p>`;
     el.hidden = false;
@@ -342,6 +348,8 @@ $('unlock').addEventListener('click', async () => {
 // straight from the tap; the page then waits for zkPass's relay.
 async function unlockWithZkpass() {
   const address = state.account.address;
+  const run = ++unlockRun;
+  const stale = () => run !== unlockRun || state.account?.address !== address;
   const ready = prepared?.kind === 'zkpass' ? prepared : null;
   prepared = null;
   state.preparing = true;
@@ -351,7 +359,7 @@ async function unlockWithZkpass() {
     if (ready) {
       openApp(ready);
       say('Sign in to your Frontiers account in zkPass, then come back here.');
-      result = await waitForRelay(ready, { cancelled: () => state.account?.address !== address });
+      result = await waitForRelay(ready, { cancelled: stale });
     } else {
       const onPhone = device() !== 'computer';
       if (!onPhone && !(await extensionInstalled())) {
@@ -360,25 +368,41 @@ async function unlockWithZkpass() {
       }
       say('Preparing your zkPass proof…');
       const task = await prepareZkpass({ appId: state.health.zkpass.app_id, schemaId: state.health.zkpass.schema_id, address });
-      if (state.account?.address !== address) return;
+      if (stale()) return;
       if (onPhone) {
         prepared = { kind: 'zkpass', ...task };
         return say('Ready. Continue in zkPass to prove your Frontiers registration.');
       }
       say("Sign in to your Frontiers account in the tab zkPass opens. The proof starts once Paradigm knows it's you.");
-      result = await runExtension(task);
+      result = await runExtension(task, { cancelled: stale });
     }
-    if (state.account?.address !== address) return;
+    if (stale()) return;
     say('Checking your proof…');
-    const outcome = await post('/verify/zkpass', { address, result });
+    const outcome = await submitProof(address, result, stale);
+    if (stale()) return;
     if (outcome.status === 'already_claimed') return say('That Frontiers account was already used.', true);
     say(outcome.already ? "You're already verified for Frontiers." : outcome.grant_delayed ? 'Verified. Your ten questions are on the way.' : 'Verified: ten questions on the house, and closer answers.');
     await refresh();
   } catch (error) {
-    say(error.message, true);
+    if (!stale()) say(error.message, true);
   } finally {
-    state.preparing = false;
+    if (run === unlockRun) state.preparing = false;
     render();
+  }
+}
+
+// A proof is worth keeping: if the agent is busy or briefly unreachable, the
+// same result is sent again rather than asking for a new proof.
+async function submitProof(address, result, stale) {
+  const passing = new Set(['rate_limited', 'starting', 'busy', 'internal', undefined]);
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await post('/verify/zkpass', { address, result });
+    } catch (error) {
+      if (!passing.has(error.code) || attempt >= 6 || stale()) throw error;
+      say('The agent is busy; sending your proof again…');
+      await sleep(2500 * attempt);
+    }
   }
 }
 

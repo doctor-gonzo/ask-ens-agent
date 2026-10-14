@@ -34,8 +34,10 @@ const tempo = createTempo({ privateKey: keys.agent, ...(env.TEMPO_RPC_URL ? { rp
 const AGENT = tempo.account.address;
 const facts = createFactsSource({ file: env.FACTS_FILE, repo: env.FACTS_REPO, path: env.FACTS_PATH || 'facts.yaml', token: env.FACTS_TOKEN });
 const model = env.MODEL === 'fixture' ? fixtureModel() : confidentialModel({ apiKey: env.CONFIDENTIAL_AI_KEY, ...(env.CONFIDENTIAL_AI_URL ? { baseUrl: env.CONFIDENTIAL_AI_URL } : {}), ...(env.MODEL ? { model: env.MODEL } : {}) });
-const reclaim = reclaimConfig(env);
 const zkpass = zkpassConfig(env);
+// One proof provider at a time: a Reclaim identity and a zkPass one can't be
+// matched, so with both on, one attendee could claim twice. zkPass wins.
+const reclaim = zkpass.ready ? { ...reclaimConfig(env), ready: false } : reclaimConfig(env);
 const skill = readFileSync(new URL('../skill/SKILL.md', import.meta.url), 'utf8');
 
 class HttpError extends Error {
@@ -261,10 +263,12 @@ async function verifyZkpass(request) {
   if (!zkpass.ready) throw new HttpError(503, 'not_ready', 'Frontiers verification is not set up yet.');
   if (!toyToken) throw new HttpError(503, 'starting', 'The agent is still setting up on Tempo; try again in a minute.');
   if (store.data.attendees[address]) return json(200, { status: 'verified', already: true });
-  limit('verify:all', 30, 60_000);
+  // The check is two signature recoveries, so junk costs little; the overall
+  // cap counts only proofs that check out, so junk can't lock attendees out.
   const outcome = await checkZkpass({ result: body?.result, schemaId: zkpass.schemaId, address })
     .catch(() => ({ ok: false, error: 'The proof could not be checked.' }));
   if (!outcome.ok) throw new HttpError(400, 'not_verified', outcome.error);
+  limit('admit:all', 30, 60_000);
   return json(200, await admit(address, outcome.identity));
 }
 

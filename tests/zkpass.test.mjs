@@ -32,6 +32,8 @@ test('zkpass: only a result zkPass assigned, for this schema and this account, c
 
   assert.deepEqual(await check(await make()), { ok: true, identity: `zkpass:${uHash}` });
   assert.deepEqual(await check({ ...(await make()), recipient: asker.toLowerCase() }), { ok: true, identity: `zkpass:${uHash}` });
+  // ABI encoding ignores hex case, so an upper-case uHash still verifies; it must still be the same person.
+  assert.deepEqual(await check({ ...(await make()), uHash: `0x${uHash.slice(2).toUpperCase()}` }), { ok: true, identity: `zkpass:${uHash}` });
   assert.equal((await check(await make(), someone().address)).ok, false, 'made for another account');
   assert.equal((await check(await make({ schema: 'ffffffffffffffffffffffffffffffff' }))).ok, false, 'another schema');
   assert.equal((await check(await make({ signer: someone() }))).ok, false, 'signed by a node zkPass did not assign');

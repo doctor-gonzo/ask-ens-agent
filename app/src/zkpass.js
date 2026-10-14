@@ -14,7 +14,8 @@ export class ZkpassError extends Error {
   constructor(code, message) { super(message); this.code = code; }
 }
 
-export const device = () => (/iPhone|iPad|iPod/i.test(navigator.userAgent) ? 'ios' : /Android/i.test(navigator.userAgent) ? 'android' : 'computer');
+const iPad = () => /Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1; // iPadOS Safari says it's a Mac
+export const device = () => (/iPhone|iPad|iPod/i.test(navigator.userAgent) || iPad() ? 'ios' : /Android/i.test(navigator.userAgent) ? 'android' : 'computer');
 
 // The extension exposes its icon to pages, which is how the SDK detects it.
 export async function extensionInstalled() {
@@ -55,15 +56,20 @@ function valuesOf(json) {
   return values.join('');
 }
 
-// The result in the SDK's shape; the validator signed the same public-fields hash.
+// The SDK's public-fields hash, which the validator signs too.
+function hashFields(fields) {
+  const data = valuesOf(fields.map((item) => (item && typeof item === 'object' ? (({ str, ...rest }) => rest)(item) : item)));
+  return keccak256(stringToHex(data ? unicodeEscaped(data) : '1'));
+}
+
+// The result in the SDK's shape.
 function resultFrom(message, task, address) {
   const fields = Array.isArray(message.publicFields) ? message.publicFields : [];
-  const data = valuesOf(fields.map((item) => (item && typeof item === 'object' ? (({ str, ...rest }) => rest)(item) : item)));
   return {
     taskId: message.taskId,
     publicFields: fields,
     allocatorAddress: task.alloc_address,
-    publicFieldsHash: keccak256(stringToHex(data ? unicodeEscaped(data) : '1')),
+    publicFieldsHash: hashFields(fields),
     allocatorSignature: task.alloc_signature,
     uHash: message.nullifierHash,
     validatorAddress: task.node_address,
@@ -72,7 +78,7 @@ function resultFrom(message, task, address) {
   };
 }
 
-export async function runExtension({ appId, schemaId, address, task }) {
+export async function runExtension({ appId, schemaId, address, task }, { cancelled = () => false } = {}) {
   const res = await fetch(`${SERVER}/schema/${encodeURIComponent(schemaId)}`);
   if (!res.ok) throw new ZkpassError('unavailable', "Couldn't load the proof's schema from zkPass.");
   const schema = await res.json();
@@ -84,12 +90,16 @@ export async function runExtension({ appId, schemaId, address, task }) {
       UNEXPECTED_VERIFY_ERROR: ['failed', 'zkPass hit an error. Try again.'],
       INVALID_SCHEMA: ['setup', 'zkPass rejected the proof setup.'],
     };
-    const stop = () => { window.removeEventListener('message', onMessage); clearTimeout(timer); };
+    const stop = () => { window.removeEventListener('message', onMessage); clearTimeout(timer); clearInterval(watch); };
     const timer = setTimeout(() => { stop(); reject(new ZkpassError('timeout', 'The zkPass proof took too long. Try again.')); }, 10 * 60_000);
+    const watch = setInterval(() => { if (cancelled()) { stop(); reject(new ZkpassError('cancelled', 'Stopped waiting for zkPass.')); } }, 1000);
+    // Any frame could post a matching message; that's harmless, since the TEE
+    // re-checks every result, but only zkPass's own outcomes end the wait.
     function onMessage(event) {
       if (event.data?.id !== params.id) return;
-      if (event.data.type === 'GENERATE_ZKP_SUCCESS') { stop(); resolve(resultFrom(event.data, task, address)); }
-      else if (outcomes[event.data.type]) { stop(); reject(new ZkpassError(...outcomes[event.data.type])); }
+      const type = event.data.type;
+      if (type === 'GENERATE_ZKP_SUCCESS') { stop(); resolve(resultFrom(event.data, task, address)); }
+      else if (typeof type === 'string' && Object.hasOwn(outcomes, type)) { stop(); reject(new ZkpassError(...outcomes[type])); }
     }
     window.addEventListener('message', onMessage);
     window.postMessage({ type: 'AUTH_ZKPASS', mintAccount: address, ...params }, '*');
@@ -111,13 +121,19 @@ export function openApp({ query }) {
   link.remove();
 }
 
-export async function waitForRelay({ callback, task }, { cancelled = () => false } = {}) {
+export async function waitForRelay({ callback, task, address }, { cancelled = () => false } = {}) {
   for (let i = 0; i < 300; i++) {
     await new Promise((resolve) => setTimeout(resolve, 2000));
     if (cancelled()) throw new ZkpassError('cancelled', 'Stopped waiting for zkPass.');
     try {
       const res = await fetch(`${callback}?task_index=${encodeURIComponent(task.task)}`, { signal: AbortSignal.timeout(5000) });
-      if (res.ok) return (await res.json())?.info;
+      const info = res.ok ? (await res.json())?.info : null;
+      if (info && typeof info === 'object') {
+        // The relay's record should already be in the SDK's shape; anything
+        // missing is filled in as the SDK would, and the TEE checks it all.
+        const fields = Array.isArray(info.publicFields) ? info.publicFields : [];
+        return { ...info, recipient: info.recipient ?? address, publicFieldsHash: info.publicFieldsHash ?? hashFields(fields) };
+      }
     } catch {}
   }
   throw new ZkpassError('timeout', 'The zkPass proof took too long. Try again.');
