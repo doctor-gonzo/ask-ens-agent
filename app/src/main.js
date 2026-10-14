@@ -619,6 +619,16 @@ function render() {
   renderWallet();
 }
 
+// The name in the corner opens a QR code of the page's address, so a phone can open it.
+const SHARE_URL = 'https://agent.charliethompson.eth.link';
+$('share').addEventListener('click', () => {
+  if (!$('share-qr').firstChild) $('share-qr').innerHTML = renderSVG(SHARE_URL, { border: 2 });
+  $('share-sheet').showModal();
+});
+$('share-sheet').addEventListener('click', (event) => {
+  if (event.target === $('share-sheet') || event.target.closest('[data-close]')) $('share-sheet').close();
+});
+
 // What to paste into an agent; skill.md tells it how to get an account, free test dollars and pay.
 $('agent-prompt').textContent = `Read ${API}/skill.md, then answer: what overlap exists between my work and interests and those of charliethompson?`;
 $('copy-prompt').addEventListener('click', () => copy($('agent-prompt').textContent, $('copy-prompt')));

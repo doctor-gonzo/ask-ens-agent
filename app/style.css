@@ -36,7 +36,9 @@ a { color: inherit; text-underline-offset: 3px; }
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: 20px 0 16px; border-bottom: 1px solid var(--line);
 }
-.name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 400 15px/1.2 var(--mono); text-decoration: none; }
+.name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0; background: none; border: 0; color: inherit; cursor: pointer; text-align: left; font: 400 15px/1.2 var(--mono); text-decoration: none; }
+.share-qr svg { display: block; width: min(240px, 70vw); height: auto; margin: 4px auto 0; }
+.share-url { text-align: center; }
 .top-right { display: flex; align-items: center; gap: 12px; }
 .balance { font: 400 15px/1 var(--mono); white-space: nowrap; }
 .account .balance { margin-left: 2px; padding-left: 10px; border-left: 1px solid var(--faint); }
