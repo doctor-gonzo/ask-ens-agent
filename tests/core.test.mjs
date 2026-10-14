@@ -177,5 +177,6 @@ test('reclaim ai provider: the signed claim must be a confirmed Frontiers page o
   assert.equal(ok({ url: 'http://www.paradigm.xyz/frontiers-2026/account', responseMatches: [{ value: 'Frontiers 2026 registered' }] }).ok, false, 'not https');
   assert.equal(ok({ url: 'https://evil.example/frontiers-2026/account', responseMatches: [{ value: 'Frontiers 2026 registered' }] }).ok, false, 'another site');
   assert.equal(ok({ url: 'https://www.paradigm.xyz/blog', responseMatches: [{ value: 'Frontiers 2026 registered' }] }).ok, false, 'another page');
+  assert.equal(ok({ url: page, responseMatches: [{ type: 'contains', value: '"status":"confirmed"', invert: true }] }).ok, false, 'an inverted match proves absence');
   assert.equal(ok({}).ok, false);
 });
