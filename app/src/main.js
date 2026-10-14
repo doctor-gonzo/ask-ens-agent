@@ -178,7 +178,8 @@ async function login(choice) {
 // Disconnecting leaves nothing of the account's answers on this device,
 // which may be shared (its payments stay on the Tempo explorer).
 function logout() {
-  if (state.account) local.remove(historyKey(state.account.address));
+  try { for (const key of Object.keys(localStorage)) if (key.startsWith('ask:history:')) localStorage.removeItem(key); } catch {}
+  $('question').value = '';
   local.remove('ask:account');
   useAccount(null);
   for (const id of ['public-answer', 'locked-answer']) { $(id).hidden = true; $(id).replaceChildren(); }

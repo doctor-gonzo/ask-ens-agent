@@ -73,7 +73,7 @@ The reply is JSON with these fields:
 - `refund`, when the question was refused
 - `signer`, `signature` and `statement`
 
-The agent's key signs every statement as an Ethereum personal-sign message. Check the signature with any verifier (viem's `verifyMessage`, for example), and check that `signer` is the `agent` in `{{API}}/attestation`; a signature alone only proves that someone signed.
+The agent's key signs every statement as an Ethereum personal-sign message. Check the signature with any verifier (viem's `verifyMessage`, for example), and check that `signer` is the `agent` inside the `statement` of `{{API}}/attestation` (the TDX quote vouches for that statement); a signature alone only proves that someone signed.
 
 ## Notes
 

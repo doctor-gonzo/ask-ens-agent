@@ -278,7 +278,7 @@ async function verifyZkpass(request) {
     .catch(() => ({ ok: false, error: 'The proof could not be checked.' }));
   if (!outcome.ok) throw new HttpError(400, 'not_verified', outcome.error);
   const owner = store.data.claims[claimKey(keys.nullifier, outcome.identity)];
-  if (owner && owner !== address) return json(200, { status: 'already_claimed' }); // a replay can't use up the cap
+  if (owner) return json(200, owner === address ? { status: 'verified', already: true } : { status: 'already_claimed' }); // a replay can't use up the cap
   limit('admit:all', 30, 60_000);
   return json(200, await admit(address, outcome.identity));
 }
