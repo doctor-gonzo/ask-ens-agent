@@ -17,16 +17,17 @@ API: `{{API}}`
 Let mppx make one (the key goes in your OS keychain):
 
 ```bash
-npx -y mppx account create --network testnet
-npx -y mppx account view            # prints its address
+npx -y mppx@0.13.4 account create --network testnet
+npx -y mppx@0.13.4 account view            # prints its address
 ```
 
-Or use a key you already have: `export MPPX_PRIVATE_KEY=0x…`.
+Or use a fresh throwaway testnet key, never one that holds real funds:
+`export MPPX_PRIVATE_KEY=0x…`.
 
 ## 2. Get free test dollars
 
 ```bash
-npx -y mppx account fund --network testnet
+npx -y mppx@0.13.4 account fund --network testnet
 ```
 
 Or ask this agent's faucet: 1.00 pathUSD (ten questions), once a day per address.
@@ -46,7 +47,7 @@ curl {{API}}/questions
 Ask, paying automatically:
 
 ```bash
-npx -y mppx {{API}}/ask --network testnet -J '{"question":"What books have you read in the last two years?"}'
+npx -y mppx@0.13.4 {{API}}/ask --network testnet -J '{"question":"What books have you read in the last two years?"}'
 ```
 
 The reply is JSON with these fields:
@@ -57,7 +58,7 @@ The reply is JSON with these fields:
 - `refund`, when the question was refused
 - `signer`, `signature` and `statement`
 
-The agent's key signs every statement as an Ethereum personal-sign message. Check it with any verifier, for example viem's `verifyMessage`.
+The agent's key signs every statement as an Ethereum personal-sign message. Check the signature with any verifier (viem's `verifyMessage`, for example), and check that `signer` is the `agent` in `{{API}}/attestation`; a signature alone only proves that someone signed.
 
 ## Notes
 

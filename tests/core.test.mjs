@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { answerQuestion, fixtureModel, grounded } from '../lib/answer.mjs';
 import { REFUSAL } from '../lib/config.mjs';
-import { capTier, factsFor, locationFor, parseFacts, questionsByTier } from '../lib/facts.mjs';
+import { capTier, factsFor, locationFor, menuFor, parseFacts, questionsByTier } from '../lib/facts.mjs';
 import { findLeaks } from '../lib/pii.mjs';
 import { attendeeFrom, claimKey } from '../lib/reclaim.mjs';
 
@@ -45,6 +45,10 @@ facts:
   assert.equal(dropped, 2); // two bad labels are dropped; their facts stay
   assert.equal(facts.find((f) => f.id === 'long-label').question, undefined);
   assert.deepEqual(questionsByTier(facts), { public: ['Where are you?'], attendee: ['Where are you?', "What's your coffee order?"] });
+  // Labels above the asker's tier stay hidden; only how many there are is shown.
+  assert.deepEqual(menuFor(facts, 'public'), { tiers: { public: ['Where are you?'], attendee: [] }, hidden: { public: 0, attendee: 2 } });
+  assert.deepEqual(menuFor(facts, 'attendee').hidden, { public: 0, attendee: 0 });
+  assert.deepEqual(menuFor(facts, 'nonsense').tiers, { public: [], attendee: [] });
   assert.equal(capTier('attendee', 'public'), 'public');
   assert.equal(capTier('public', 'attendee'), 'public');
   assert.equal(capTier('attendee', undefined), 'attendee');

@@ -98,8 +98,12 @@ export async function runExtension({ appId, schemaId, address, task }, { cancell
     function onMessage(event) {
       if (event.data?.id !== params.id) return;
       const type = event.data.type;
-      if (type === 'GENERATE_ZKP_SUCCESS') { stop(); resolve(resultFrom(event.data, task, address)); }
-      else if (typeof type === 'string' && Object.hasOwn(outcomes, type)) { stop(); reject(new ZkpassError(...outcomes[type])); }
+      if (type === 'GENERATE_ZKP_SUCCESS') {
+        let result; // built before the wait ends, so odd data rejects instead of hanging
+        try { result = resultFrom(event.data, task, address); } catch { stop(); return reject(new ZkpassError('failed', 'zkPass sent a result this page could not read. Try again.')); }
+        stop();
+        resolve(result);
+      } else if (typeof type === 'string' && Object.hasOwn(outcomes, type)) { stop(); reject(new ZkpassError(...outcomes[type])); }
     }
     window.addEventListener('message', onMessage);
     window.postMessage({ type: 'AUTH_ZKPASS', mintAccount: address, ...params }, '*');

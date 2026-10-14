@@ -171,10 +171,14 @@ async function login(choice) {
   if (!backedUp) say("Couldn't back up this passkey, so it only works on this device.", true);
 }
 
+// Disconnecting leaves nothing of the account's answers on this device,
+// which may be shared (its payments stay on the Tempo explorer).
 function logout() {
+  if (state.account) local.remove(historyKey(state.account.address));
   local.remove('ask:account');
   useAccount(null);
-  for (const id of ['public-answer', 'locked-answer']) $(id).hidden = true;
+  for (const id of ['public-answer', 'locked-answer']) { $(id).hidden = true; $(id).replaceChildren(); }
+  $('history').replaceChildren();
   say('');
 }
 
@@ -201,32 +205,39 @@ $('login').addEventListener('close', async () => {
 
 // ---- The account sheet: balance, top-ups, payments, sign-out ----
 
-const historyKey = () => `ask:history:${state.account?.address}`;
-function remember(entry) {
-  if (state.account) local.set(historyKey(), [{ at: Date.now(), ...entry }, ...(local.get(historyKey()) ?? [])].slice(0, 50));
+// Kept per account, under the account that paid, even if another signs in meanwhile.
+const historyKey = (address) => `ask:history:${address}`;
+function remember(entry, address) {
+  if (!address) return;
+  local.set(historyKey(address), [{ at: Date.now(), ...entry }, ...(local.get(historyKey(address)) ?? [])].slice(0, 50));
+  if ($('wallet-sheet').open && state.account?.address === address) renderHistory();
 }
 
 // Copies, then shows it worked for a moment: an icon button turns into a check.
 async function copy(text, button) {
   try {
     await navigator.clipboard.writeText(text);
-    const label = button.querySelector('svg') ? null : button.textContent;
+    clearTimeout(button.copiedTimer);
+    if (!button.querySelector('svg')) { button.dataset.label ??= button.textContent; button.textContent = 'Copied'; }
     button.classList.add('copied');
-    if (label) button.textContent = 'Copied';
-    setTimeout(() => { button.classList.remove('copied'); if (label) button.textContent = label; }, 1500);
+    button.copiedTimer = setTimeout(() => {
+      button.classList.remove('copied');
+      if (button.dataset.label) button.textContent = button.dataset.label;
+    }, 1500);
   } catch {}
 }
 
 $('account').addEventListener('click', () => {
   if (!state.account) return openLogin();
   render();
+  renderHistory();
   $('wallet-sheet').showModal();
   refresh();
 });
 $('wallet-sheet').addEventListener('click', (event) => {
   if (event.target === $('wallet-sheet') || event.target.closest('[data-close]')) $('wallet-sheet').close();
 });
-$('wallet-sheet').addEventListener('close', () => statusAt((el) => $('wallet').before(el)));
+$('wallet-sheet').addEventListener('close', () => { if ($('wallet-sheet').contains($('status'))) statusAt((el) => $('wallet').before(el)); });
 $('top-up').addEventListener('click', () => faucet());
 $('copy-address').addEventListener('click', () => copy(state.account?.address ?? '', $('copy-address')));
 $('sign-out').addEventListener('click', () => {
@@ -302,7 +313,7 @@ async function ask(question, where) {
     const el = $(where);
     el.innerHTML = `<p class="meta">${escape(question)}</p><blockquote class="${data.refused ? 'refused' : ''}">${escape(data.answer)}</blockquote><p class="meta">${receiptLine(data, tx)}</p>`;
     el.hidden = false;
-    remember({ kind: 'ask', question, answer: String(data.answer ?? ''), refused: Boolean(data.refused), tx, refunded: Boolean(data.refund), refund: data.refund?.tx ?? null });
+    remember({ kind: 'ask', question, answer: String(data.answer ?? ''), refused: Boolean(data.refused), tx, refunded: Boolean(data.refund), refund: data.refund?.tx ?? null }, address);
     busy(false);
   } catch (error) {
     busy(false);
@@ -327,7 +338,7 @@ async function faucet(quiet = false) {
   const address = state.account.address;
   try {
     const sent = await post('/faucet', { address });
-    remember({ kind: 'faucet', tx: sent.tx ?? null });
+    remember({ kind: 'faucet', tx: sent.tx ?? null }, address);
     busy(false, '$1.00 added: ten questions.');
   } catch (error) {
     if (error.code === 'already_funded') {
@@ -336,7 +347,7 @@ async function faucet(quiet = false) {
       // The agent's relay is busy or down: ask Tempo's own testnet faucet directly.
       try {
         await rpc.request({ method: 'tempo_fundAddress', params: [address] });
-        remember({ kind: 'faucet', tx: null });
+        remember({ kind: 'faucet', tx: null }, address);
         busy(false, 'Free test dollars added from the Tempo faucet.');
       } catch {
         busy(false, error.message);
@@ -425,7 +436,7 @@ async function unlockWithZkpass() {
     const outcome = await submitProof(address, result, stale);
     if (stale()) return;
     if (outcome.status === 'already_claimed') return say('That Frontiers account was already used.', true);
-    if (!outcome.already) remember({ kind: 'grant', tx: outcome.tx ?? null });
+    if (!outcome.already) remember({ kind: 'grant', tx: outcome.tx ?? null }, address);
     say(outcome.already ? "You're already verified for Frontiers." : outcome.grant_delayed ? 'Verified. Your ten questions are on the way.' : 'Verified: ten questions on the house, and closer answers.');
     await refresh();
   } catch (error) {
@@ -444,9 +455,10 @@ async function submitProof(address, result, stale) {
     try {
       return await post('/verify/zkpass', { address, result });
     } catch (error) {
-      if (!passing.has(error.code) || attempt >= 6 || stale()) throw error;
+      if (!passing.has(error.code) || attempt >= 8 || stale()) throw error;
       say('The agent is busy; sending your proof again…');
-      await sleep(2500 * attempt);
+      await sleep(3000 * attempt); // about 80 s in all, longer than the minute the cap counts
+      if (stale()) throw error;
     }
   }
 }
@@ -520,7 +532,11 @@ function renderWallet() {
   $('wallet-explorer').href = page;
   $('wallet-total').textContent = money(state.toy + state.usd);
   $('top-up').disabled = state.busy;
-  const items = (local.get(historyKey()) ?? []).slice(0, 20).map(historyItem);
+}
+
+// Rebuilt only on opening and after a payment, so an opened answer stays open.
+function renderHistory() {
+  const items = state.account ? (local.get(historyKey(state.account.address)) ?? []).slice(0, 20).map(historyItem) : [];
   if (!items.length) {
     const none = document.createElement('li');
     none.className = 'none';

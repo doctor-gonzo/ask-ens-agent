@@ -12,8 +12,8 @@ import { Credential } from 'mppx';
 import { Mppx, NodeListener, tempo as mppTempo } from 'mppx/server';
 import { getAddress, isAddress } from 'viem';
 import { answerQuestion, confidentialModel, fixtureModel } from '../lib/answer.mjs';
-import { CHAIN_ID, DAILY_QUESTIONS, EXPLORER_URL, GRANT_UNITS, MAX_QUESTION_CHARS, PATHUSD, PRICE, PRICE_UNITS, TIERS, TOY } from '../lib/config.mjs';
-import { capTier, createFactsSource, factsFor, locationFor, questionsByTier } from '../lib/facts.mjs';
+import { CHAIN_ID, DAILY_QUESTIONS, EXPLORER_URL, GRANT_UNITS, MAX_QUESTION_CHARS, PATHUSD, PRICE, PRICE_UNITS, TOY } from '../lib/config.mjs';
+import { capTier, createFactsSource, factsFor, locationFor, menuFor } from '../lib/facts.mjs';
 import { loadKeys } from '../lib/keys.mjs';
 import { checkProof, claimKey, reclaimConfig, SESSION_TTL_MS, startProof } from '../lib/reclaim.mjs';
 import { dayOf, openStore } from '../lib/store.mjs';
@@ -45,7 +45,7 @@ class HttpError extends Error {
 }
 const json = (status, body, headers = {}) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store', ...headers } });
 const sha256 = (text) => createHash('sha256').update(text).digest('hex');
-const addressOf = (value) => (typeof value === 'string' && isAddress(value, { strict: false }) ? getAddress(value) : null);
+const addressOf = (value) => (typeof value === 'string' && value.length === 42 && isAddress(value, { strict: false }) ? getAddress(value) : null);
 const tierOf = (address) => (address && store.data.attendees[address] ? 'attendee' : 'public');
 
 // ---- Tempo setup: the faucet float and the toy token, retried until done ----
@@ -268,6 +268,8 @@ async function verifyZkpass(request) {
   const outcome = await checkZkpass({ result: body?.result, schemaId: zkpass.schemaId, address })
     .catch(() => ({ ok: false, error: 'The proof could not be checked.' }));
   if (!outcome.ok) throw new HttpError(400, 'not_verified', outcome.error);
+  const owner = store.data.claims[claimKey(keys.nullifier, outcome.identity)];
+  if (owner && owner !== address) return json(200, { status: 'already_claimed' }); // a replay can't use up the cap
   limit('admit:all', 30, 60_000);
   return json(200, await admit(address, outcome.identity));
 }
@@ -317,6 +319,7 @@ function parseProof(text) {
 }
 
 async function proofCallback(request, session) {
+  if (!reclaim.ready) throw new HttpError(404, 'not_found', 'No such verification.');
   const pending = /^[0-9a-f]{32}$/.test(session ?? '') && store.data.sessions[session];
   if (!pending || pending.status !== 'pending' || pending.expires_at <= Date.now()) throw new HttpError(404, 'not_found', 'No such verification.');
   if (!toyToken) throw new HttpError(503, 'starting', 'The agent is still setting up on Tempo; try again in a minute.');
@@ -363,19 +366,8 @@ async function savePasskey(request) {
 
 // ---- The question menu: labels only, and only up to the asker's tier ----
 
-// Questions above an account's tier stay hidden (only how many there are is
-// shown) until the account is admitted to that tier.
 async function questions(forAddress) {
-  const rank = TIERS.indexOf(tierOf(addressOf(forAddress)));
-  const menu = questionsByTier((await facts.get()).facts);
-  const tiers = {};
-  const hidden = {};
-  for (const [tier, labels] of Object.entries(menu)) {
-    const open = TIERS.indexOf(tier) <= rank;
-    tiers[tier] = open ? labels : [];
-    hidden[tier] = open ? 0 : labels.length;
-  }
-  return json(200, { tiers, hidden });
+  return json(200, menuFor((await facts.get()).facts, tierOf(addressOf(forAddress))));
 }
 
 // ---- Attestation: inside the CVM, a TDX quote over what this agent is ----
