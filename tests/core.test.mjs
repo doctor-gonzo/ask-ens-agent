@@ -72,6 +72,7 @@ test('site: the website becomes short public facts; menu questions are told apar
   assert.equal(facts[0].text, '# Charlie Thompson Short intro.');
   assert.ok(!facts.some((fact) => /^(source|---)/i.test(fact.text)));
   assert.equal(siteFacts('').length, 0);
+  assert.ok(siteFacts(Array.from({ length: 200 }, (_, i) => `## Heading ${i}`).join('\n')).every((fact) => fact.text.length <= 450), 'runs of headings stay within a fact');
   const { facts: menu } = parseFacts('facts:\n  - { id: where, tier: public, question: "Where are you?", text: "Charlie is in San Francisco." }\n');
   assert.equal(isListed(menu, '  where are you? '), true);
   assert.equal(isListed(menu, "What is Charlie's most contrarian position?"), false);

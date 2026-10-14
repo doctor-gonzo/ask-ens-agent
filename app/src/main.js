@@ -316,10 +316,10 @@ async function ask(question, where, units = PRICE) {
   statusAt((el) => $(where).before(el));
   busy(true, `Paying ${money(units)} and asking…`);
   try {
-    const { data, tx } = await paid('/ask', where === 'public-answer' ? { question, as: 'public' } : { question }, units);
+    const { data, tx } = await paid('/ask', { question, as: where === 'public-answer' ? 'public' : 'attendee' }, units);
     if (state.account?.address !== address) return busy(false); // signed out meanwhile: the answer isn't shown to the next person
     const el = $(where);
-    const charged = data.price === '0.25' ? OWN_PRICE : PRICE;
+    const charged = data.price === '0.25' ? OWN_PRICE : data.price === '0.10' ? PRICE : units;
     el.innerHTML = `<p class="meta">${escape(question)}</p><blockquote class="${data.refused ? 'refused' : ''}">${escape(data.answer)}</blockquote><p class="meta">${receiptLine(data, tx, charged)}</p>`;
     el.hidden = false;
     remember({ kind: 'ask', question, answer: String(data.answer ?? ''), refused: Boolean(data.refused), tx, price: charged.toString(), refunded: Boolean(data.refund), refund: data.refund?.tx ?? null }, address);
@@ -335,7 +335,7 @@ async function ask(question, where, units = PRICE) {
 $('ask-form').addEventListener('submit', (event) => {
   event.preventDefault();
   const question = $('question').value.trim() || DEFAULT_QUESTION;
-  const listed = [...state.menu.public, ...state.menu.attendee].some((q) => q.toLowerCase() === question.toLowerCase());
+  const listed = state.menu.public.some((q) => q.toLowerCase() === question.toLowerCase()); // as the agent prices it
   ask(question, 'public-answer', listed ? PRICE : OWN_PRICE);
 });
 

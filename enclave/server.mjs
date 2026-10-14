@@ -161,7 +161,7 @@ async function paid(request, description, work, price = LISTED) {
   try {
     limit('paid:minute', 60, 60_000);
   } catch {
-    return result.withReceipt(json(200, await signed({ busy: true, refused: true, answer: 'The agent is busy right now; try again in a minute.', refund: await refund(payer, currency, price), at: Date.now() })));
+    return result.withReceipt(json(200, await signed({ busy: true, refused: true, answer: 'The agent is busy right now; try again in a minute.', price: price.amount, refund: await refund(payer, currency, price), at: Date.now() })));
   }
   return result.withReceipt(json(200, await work({ payer, currency })));
 }
@@ -187,9 +187,11 @@ async function ask(request) {
   const body = await request.clone().json().catch(() => null);
   const question = typeof body?.question === 'string' ? body.question.trim() : '';
   if (!question || question.length > MAX_QUESTION_CHARS) throw new HttpError(400, 'bad_question', `Ask a question of up to ${MAX_QUESTION_CHARS} characters.`);
-  // A question from the menu is answered from the approved facts. One of the
-  // asker's own also draws on Charlie's website, and costs more.
-  const listed = isListed((await facts.get()).facts, question);
+  // A question from a card's menu is answered from the approved facts at the
+  // menu price; one of the asker's own also draws on Charlie's website. Only
+  // public labels set the price (so it says nothing about hidden ones), and
+  // the locked card always asks at the menu price.
+  const listed = body?.as === 'attendee' || isListed(factsFor((await facts.get()).facts, 'public'), question);
   const price = listed ? LISTED : OWN;
   return paid(request, 'One question for agent.charliethompson.eth', async ({ payer, currency }) => {
     const own = tierOf(payer); // sets the daily allowance
@@ -198,7 +200,7 @@ async function ask(request) {
     const who = payer ?? 'unknown';
     const used = store.data.questions[who]?.day === day ? store.data.questions[who].count : 0;
     if (used >= DAILY_QUESTIONS[own]) {
-      return signed({ answer: "That's all the questions for today.", refused: true, tier, refund: await refund(payer, currency, price), at: Date.now() });
+      return signed({ answer: "That's all the questions for today.", refused: true, tier, price: price.amount, refund: await refund(payer, currency, price), at: Date.now() });
     }
     store.update((data) => { data.questions[who] = { day, count: used + 1 }; });
     const { facts: approved } = await facts.get();
