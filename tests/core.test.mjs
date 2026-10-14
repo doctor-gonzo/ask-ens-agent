@@ -6,7 +6,7 @@ import { REFUSAL } from '../lib/config.mjs';
 import { capTier, factsFor, isListed, locationFor, menuFor, parseFacts, questionsByTier } from '../lib/facts.mjs';
 import { siteFacts } from '../lib/site.mjs';
 import { findLeaks } from '../lib/pii.mjs';
-import { attendeeFrom, claimKey } from '../lib/reclaim.mjs';
+import { aiAttendee, attendeeFrom, claimKey } from '../lib/reclaim.mjs';
 
 const YAML = `
 facts:
@@ -162,4 +162,20 @@ test('attendance: only a confirmed registration counts, one claim per account', 
   const secret = `0x${'11'.repeat(32)}`;
   assert.equal(claimKey(secret, 'email:a@b.co'), claimKey(secret, 'email:a@b.co'));
   assert.notEqual(claimKey(secret, 'email:a@b.co'), claimKey(`0x${'22'.repeat(32)}`, 'email:a@b.co'));
+});
+
+test('reclaim ai provider: the signed claim must be a confirmed Frontiers page on paradigm.xyz', () => {
+  const address = '0x66C3677EF0184833eC635d776456728Dd28aAdF4';
+  const page = 'https://www.paradigm.xyz/frontiers-2026/account';
+  const ok = (parameters, extracted) => aiAttendee({ parameters, extracted, address });
+  assert.deepEqual(ok({ url: page, responseMatches: [{ type: 'contains', value: 'Frontiers 2026 registered' }] }), { ok: true, identity: `account:${address.toLowerCase()}` });
+  assert.deepEqual(ok({ url: 'https://www.paradigm.xyz/api/frontiers-2026/status', responseMatches: [] }, { status: 'confirmed', email: 'A@Example.com' }), { ok: true, identity: 'email:a@example.com' });
+  assert.equal(ok({ url: page, responseMatches: [{ type: 'regex', value: '"status":"confirmed"' }] }).ok, true);
+  assert.equal(ok({ url: page, responseMatches: [{ type: 'contains', value: 'Frontiers 2026 not registered' }] }).ok, false, 'negated');
+  assert.equal(ok({ url: page, responseMatches: [{ type: 'contains', value: 'Status unconfirmed' }] }).ok, false, 'unconfirmed');
+  assert.equal(ok({ url: page, responseMatches: [{ type: 'contains', value: 'Frontiers 2026' }] }).ok, false, 'no confirmation');
+  assert.equal(ok({ url: 'http://www.paradigm.xyz/frontiers-2026/account', responseMatches: [{ value: 'Frontiers 2026 registered' }] }).ok, false, 'not https');
+  assert.equal(ok({ url: 'https://evil.example/frontiers-2026/account', responseMatches: [{ value: 'Frontiers 2026 registered' }] }).ok, false, 'another site');
+  assert.equal(ok({ url: 'https://www.paradigm.xyz/blog', responseMatches: [{ value: 'Frontiers 2026 registered' }] }).ok, false, 'another page');
+  assert.equal(ok({}).ok, false);
 });

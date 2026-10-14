@@ -15,7 +15,7 @@ import { answerQuestion, confidentialModel, fixtureModel } from '../lib/answer.m
 import { CHAIN_ID, DAILY_QUESTIONS, EXPLORER_URL, GRANT_UNITS, MAX_QUESTION_CHARS, OWN_PRICE, OWN_PRICE_UNITS, PATHUSD, PRICE, PRICE_UNITS, TOY } from '../lib/config.mjs';
 import { capTier, createFactsSource, factsFor, isListed, locationFor, menuFor } from '../lib/facts.mjs';
 import { loadKeys } from '../lib/keys.mjs';
-import { checkProof, claimKey, reclaimConfig, SESSION_TTL_MS, startProof } from '../lib/reclaim.mjs';
+import { checkProof, claimKey, claimShape, reclaimConfig, SESSION_TTL_MS, startProof } from '../lib/reclaim.mjs';
 import { createSiteSource } from '../lib/site.mjs';
 import { dayOf, openStore } from '../lib/store.mjs';
 import { createTempo } from '../lib/tempo.mjs';
@@ -38,10 +38,11 @@ const site = createSiteSource(env.SITE_URL ? { base: env.SITE_URL } : {}); // ch
 const LISTED = { amount: PRICE, units: PRICE_UNITS };
 const OWN = { amount: OWN_PRICE, units: OWN_PRICE_UNITS };
 const model = env.MODEL === 'fixture' ? fixtureModel() : confidentialModel({ apiKey: env.CONFIDENTIAL_AI_KEY, ...(env.CONFIDENTIAL_AI_URL ? { baseUrl: env.CONFIDENTIAL_AI_URL } : {}), ...(env.MODEL ? { model: env.MODEL } : {}) });
-const zkpass = zkpassConfig(env);
+const reclaim = reclaimConfig(env);
 // One proof provider at a time: a Reclaim identity and a zkPass one can't be
-// matched, so with both on, one attendee could claim twice. zkPass wins.
-const reclaim = zkpass.ready ? { ...reclaimConfig(env), ready: false } : reclaimConfig(env);
+// matched, so with both on, one attendee could claim twice. Reclaim wins when
+// configured, since its web portal needs nothing installed.
+const zkpass = reclaim.ready ? { ...zkpassConfig(env), ready: false } : zkpassConfig(env);
 const skill = readFileSync(new URL('../skill/SKILL.md', import.meta.url), 'utf8');
 
 class HttpError extends Error {
@@ -352,6 +353,7 @@ async function proofCallback(request, session) {
   // A bad post doesn't close the session at once (anyone who saw the link could
   // spoil it); after three failures it is closed, so checks can't be repeated forever.
   if (!outcome.ok) {
+    console.log(`reclaim: turned down (${outcome.error}) ${JSON.stringify(claimShape(proof))}`);
     const failures = (pending.failures ?? 0) + 1;
     finish({ status: failures >= 3 ? 'failed' : 'pending', failures, error: outcome.error });
     throw new HttpError(400, 'not_verified', outcome.error);

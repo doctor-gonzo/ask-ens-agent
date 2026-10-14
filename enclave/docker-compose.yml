@@ -15,11 +15,14 @@ services:
       REQUIRE_TEE: "1"
       FACTS_REPO: "doctor-gonzo/ask-ens-agent-data"
       FACTS_PATH: "facts.yaml"
-      # Empty until the Frontiers provider exists; verification stays off meanwhile.
-      RECLAIM_PROVIDER_ID: ""
-      RECLAIM_PROVIDER_VERSION: ""
-      # zkPass proves Frontiers registration meanwhile. Both ids are public, and
-      # the schema id here is the only proof this TEE accepts (docs/zkpass-schema.json).
+      # Reclaim's AI-built Frontiers provider: proofs run in Reclaim's web portal
+      # (nothing to install). It has no request hashes, so the agent checks the
+      # signed claim's content itself (lib/reclaim.mjs aiAttendee).
+      RECLAIM_PROVIDER_ID: "91e61e57-38f3-4127-8504-beae06d496be"
+      RECLAIM_PROVIDER_VERSION: "1.0.0"
+      RECLAIM_AI_PROVIDER: "1"
+      # zkPass, used only while Reclaim isn't configured. Both ids are public, and
+      # the schema id here is the only proof it accepts (docs/zkpass-schema.json).
       ZKPASS_APP_ID: "69068e60-08b4-42be-a15d-5f2a9220c682"
       ZKPASS_SCHEMA_ID: "8249f91782964a7fa460c467577edcf8"
     ports:
